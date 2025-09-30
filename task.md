@@ -12,10 +12,10 @@
   - [x] 1.2.3 Establish theme tokens (colors, spacing, animation durations).
 
 ## 2. Core Runtime Development
-- [ ] **2.1 Scheduler module**
-  - [ ] 2.1.1 Model single daily focus window and pause toggle.
-  - [ ] 2.1.2 Wire alarms for start/end of focus period.
-  - [ ] 2.1.3 Broadcast focus state changes to listeners.
+- [x] **2.1 Scheduler module**
+  - [x] 2.1.1 Model single daily focus window and pause toggle.
+  - [x] 2.1.2 Wire alarms for start/end of focus period.
+  - [x] 2.1.3 Broadcast focus state changes to listeners.
 - [ ] **2.2 Site detection module**
   - [ ] 2.2.1 Implement wildcard domain matching (including subdomains).
   - [ ] 2.2.2 Load default blocklist and merge with user overrides.
