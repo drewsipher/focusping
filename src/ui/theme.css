@@ -1,0 +1,27 @@
+:root {
+  --color-gradient-light-start: #f97316;
+  --color-gradient-light-end: #6366f1;
+  --color-gradient-dark-start: #0ea5e9;
+  --color-gradient-dark-end: #6366f1;
+  --color-surface-light: rgba(255, 255, 255, 0.92);
+  --color-surface-dark: rgba(15, 23, 42, 0.9);
+  --color-text-primary: #111827;
+  --color-text-secondary: #1f2933;
+  --color-text-on-dark: #f9fafb;
+  --color-button-dark: #111827;
+  --color-button-light: #f9fafb;
+  --color-link: #0f172a;
+
+  --radius-medium: 12px;
+  --radius-pill: 999px;
+
+  --shadow-elevated: 0 16px 30px rgba(15, 23, 42, 0.2);
+  --shadow-hover: 0 10px 18px rgba(15, 23, 42, 0.25);
+
+  --transition-quick: 150ms ease;
+
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+}

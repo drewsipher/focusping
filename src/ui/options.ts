@@ -1,25 +1,25 @@
-type Mode = "gentle" | "strict";
+import { runtime } from "@/shared/chrome";
+import {
+  defaults,
+  getSettings,
+  mutateSettings,
+  onSettingsChanged,
+  type Mode,
+  type Settings,
+} from "@/shared/storage";
 
-type Settings = {
+type FormSnapshot = {
   mode: Mode;
-  scheduleStart: string;
-  scheduleEnd: string;
-  reminderFrequency: number;
-  snoozeDuration: number;
-  showGifs: boolean;
-  pausedOutsideSchedule: boolean;
-  blocklist: string[];
-};
-
-const defaultSettings: Settings = {
-  mode: "gentle",
-  scheduleStart: "08:00",
-  scheduleEnd: "18:00",
-  reminderFrequency: 5,
-  snoozeDuration: 10,
-  showGifs: true,
-  pausedOutsideSchedule: false,
-  blocklist: [],
+  schedule: {
+    start: string;
+    end: string;
+    pausedOutsideSchedule: boolean;
+  };
+  reminder: {
+    frequencyMinutes: number;
+    snoozeMinutes: number;
+    showGifs: boolean;
+  };
 };
 
 const queryInput = <ElementType extends HTMLElement>(id: string) => {
@@ -41,16 +41,6 @@ function getFormElements() {
   };
 }
 
-async function loadSettings(): Promise<Settings> {
-  const stored = await chrome.storage.sync.get(defaultSettings);
-  const parsed: Settings = {
-    ...defaultSettings,
-    ...stored,
-    blocklist: Array.isArray(stored.blocklist) ? stored.blocklist : defaultSettings.blocklist,
-  };
-  return parsed;
-}
-
 function renderBlocklist(items: string[], listEl: HTMLUListElement) {
   listEl.innerHTML = "";
   items.forEach((domain) => {
@@ -61,9 +51,11 @@ function renderBlocklist(items: string[], listEl: HTMLUListElement) {
     removeButton.textContent = "Remove";
     removeButton.type = "button";
     removeButton.addEventListener("click", async () => {
-      const next = items.filter((value) => value !== domain);
-      await chrome.storage.sync.set({ blocklist: next });
-      renderBlocklist(next, listEl);
+      const updated = await mutateSettings((settings) => ({
+        ...settings,
+        blocklist: settings.blocklist.filter((value) => value !== domain),
+      }));
+      applySettingsToForm(updated);
     });
 
     li.appendChild(removeButton);
@@ -87,19 +79,19 @@ function applySettingsToForm(settings: Settings) {
     input.checked = input.value === settings.mode;
   });
 
-  if (scheduleStart) scheduleStart.value = settings.scheduleStart;
-  if (scheduleEnd) scheduleEnd.value = settings.scheduleEnd;
-  if (schedulePaused) schedulePaused.checked = settings.pausedOutsideSchedule;
-  if (reminderFrequency) reminderFrequency.valueAsNumber = settings.reminderFrequency;
-  if (snoozeDuration) snoozeDuration.valueAsNumber = settings.snoozeDuration;
-  if (gifToggle) gifToggle.checked = settings.showGifs;
+  if (scheduleStart) scheduleStart.value = settings.schedule.start;
+  if (scheduleEnd) scheduleEnd.value = settings.schedule.end;
+  if (schedulePaused) schedulePaused.checked = settings.schedule.pausedOutsideSchedule;
+  if (reminderFrequency) reminderFrequency.valueAsNumber = settings.reminder.frequencyMinutes;
+  if (snoozeDuration) snoozeDuration.valueAsNumber = settings.reminder.snoozeMinutes;
+  if (gifToggle) gifToggle.checked = settings.reminder.showGifs;
 
   if (blocklist) {
     renderBlocklist(settings.blocklist, blocklist);
   }
 }
 
-function readSettingsFromForm(): Settings {
+function readSettingsFromForm(): FormSnapshot {
   const {
     modeInputs,
     scheduleStart,
@@ -108,30 +100,48 @@ function readSettingsFromForm(): Settings {
     reminderFrequency,
     snoozeDuration,
     gifToggle,
-    blocklist,
   } = getFormElements();
 
   const mode = (modeInputs.find((input) => input.checked)?.value as Mode | undefined) ?? "gentle";
 
+  const safeNumber = (input: HTMLInputElement | null, fallback: number) => {
+    const value = input?.valueAsNumber;
+    return Number.isFinite(value) && value !== null ? (value as number) : fallback;
+  };
+
   return {
     mode,
-    scheduleStart: scheduleStart?.value || defaultSettings.scheduleStart,
-    scheduleEnd: scheduleEnd?.value || defaultSettings.scheduleEnd,
-    pausedOutsideSchedule: !!schedulePaused?.checked,
-    reminderFrequency: reminderFrequency?.valueAsNumber || defaultSettings.reminderFrequency,
-    snoozeDuration: snoozeDuration?.valueAsNumber || defaultSettings.snoozeDuration,
-    showGifs: !!gifToggle?.checked,
-    blocklist: blocklist
-      ? Array.from(blocklist.querySelectorAll("li")).map((item) => item.textContent ?? "")
-      : defaultSettings.blocklist,
+    schedule: {
+      start: scheduleStart?.value || defaults.settings.schedule.start,
+      end: scheduleEnd?.value || defaults.settings.schedule.end,
+      pausedOutsideSchedule: Boolean(schedulePaused?.checked),
+    },
+    reminder: {
+      frequencyMinutes: safeNumber(reminderFrequency, defaults.settings.reminder.frequencyMinutes),
+      snoozeMinutes: safeNumber(snoozeDuration, defaults.settings.reminder.snoozeMinutes),
+      showGifs: Boolean(gifToggle?.checked),
+    },
   };
 }
 
-async function saveSettings(event?: Event) {
+async function persistSettings(event?: Event) {
   event?.preventDefault();
-  const settings = readSettingsFromForm();
-  await chrome.storage.sync.set(settings);
-  chrome.runtime.sendMessage({ type: "focus-ping::state-updated" });
+  const formValues = readSettingsFromForm();
+  const updated = await mutateSettings((settings) => ({
+    ...settings,
+    mode: formValues.mode,
+    schedule: {
+      ...settings.schedule,
+      ...formValues.schedule,
+    },
+    reminder: {
+      ...settings.reminder,
+      ...formValues.reminder,
+    },
+  }));
+
+  applySettingsToForm(updated);
+  await runtime.sendMessage({ type: "focus-ping::state-updated" });
 }
 
 async function handleBlocklistSubmit(event: SubmitEvent) {
@@ -139,40 +149,44 @@ async function handleBlocklistSubmit(event: SubmitEvent) {
   const { domainInput } = getFormElements();
   if (!domainInput) return;
 
-  const url = domainInput.value.trim();
-  if (!url) return;
+  const raw = domainInput.value.trim();
+  if (!raw) return;
 
   try {
-    const parsed = new URL(url);
+    const parsed = new URL(raw.includes("://") ? raw : `https://${raw}`);
     const hostname = parsed.hostname.replace(/^www\./, "");
-    const settings = await loadSettings();
-    if (!settings.blocklist.includes(hostname)) {
-      const next = [...settings.blocklist, hostname];
-      await chrome.storage.sync.set({ blocklist: next });
-      const elements = getFormElements();
-      if (elements.blocklist) {
-        renderBlocklist(next, elements.blocklist);
+    const updated = await mutateSettings((settings) => {
+      if (settings.blocklist.includes(hostname)) {
+        return settings;
       }
-    }
+      return {
+        ...settings,
+        blocklist: [...settings.blocklist, hostname],
+      };
+    });
+    applySettingsToForm(updated);
     domainInput.value = "";
+    await runtime.sendMessage({ type: "focus-ping::state-updated" });
   } catch (error) {
     console.error("Invalid URL", error);
   }
 }
 
 async function bootstrap() {
-  const settings = await loadSettings();
-  applySettingsToForm(settings);
+  const initial = await getSettings();
+  applySettingsToForm(initial);
 
   const elements = getFormElements();
-  elements.modeInputs.forEach((input) => input.addEventListener("change", saveSettings));
-  elements.scheduleStart?.addEventListener("change", saveSettings);
-  elements.scheduleEnd?.addEventListener("change", saveSettings);
-  elements.schedulePaused?.addEventListener("change", saveSettings);
-  elements.reminderFrequency?.addEventListener("change", saveSettings);
-  elements.snoozeDuration?.addEventListener("change", saveSettings);
-  elements.gifToggle?.addEventListener("change", saveSettings);
+  elements.modeInputs.forEach((input) => input.addEventListener("change", persistSettings));
+  elements.scheduleStart?.addEventListener("change", persistSettings);
+  elements.scheduleEnd?.addEventListener("change", persistSettings);
+  elements.schedulePaused?.addEventListener("change", persistSettings);
+  elements.reminderFrequency?.addEventListener("change", persistSettings);
+  elements.snoozeDuration?.addEventListener("change", persistSettings);
+  elements.gifToggle?.addEventListener("change", persistSettings);
   elements.blocklistForm?.addEventListener("submit", handleBlocklistSubmit);
+
+  onSettingsChanged(applySettingsToForm);
 }
 
 bootstrap().catch(console.error);

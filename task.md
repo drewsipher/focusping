@@ -6,10 +6,10 @@
   - [x] 1.1.2 Configure build tooling (Vite or webpack) for Chrome MV3 output.
   - [x] 1.1.3 Add TypeScript support with ESLint, Prettier, and path aliases.
   - [x] 1.1.4 Create base `manifest.json` with required permissions (`tabs`, `storage`, `notifications`, `alarms`).
-- [ ] **1.2 Shared utilities groundwork**
-  - [ ] 1.2.1 Implement Chrome API wrapper module (tabs, storage, alarms, notifications).
-  - [ ] 1.2.2 Seed default settings schema and storage migration helpers.
-  - [ ] 1.2.3 Establish theme tokens (colors, spacing, animation durations).
+- [x] **1.2 Shared utilities groundwork**
+  - [x] 1.2.1 Implement Chrome API wrapper module (tabs, storage, alarms, notifications).
+  - [x] 1.2.2 Seed default settings schema and storage migration helpers.
+  - [x] 1.2.3 Establish theme tokens (colors, spacing, animation durations).
 
 ## 2. Core Runtime Development
 - [ ] **2.1 Scheduler module**
