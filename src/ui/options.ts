@@ -2,8 +2,8 @@ import { runtime } from "@/shared/chrome";
 import {
   defaults,
   getSettings,
-  mutateSettings,
   onSettingsChanged,
+  setSettings,
   type Mode,
   type Settings,
 } from "@/shared/storage";
@@ -27,6 +27,7 @@ const queryInput = <ElementType extends HTMLElement>(id: string) => {
 };
 
 let currentSettings: Settings | null = null;
+let isSaving = false;
 
 function isMissingReceiverError(error: unknown) {
   return (
@@ -60,7 +61,53 @@ function getFormElements() {
     blocklistForm: queryInput<HTMLFormElement>("blocklist-form"),
     domainInput: queryInput<HTMLInputElement>("domain-input"),
     blocklistBody: queryInput<HTMLTableSectionElement>("blocklist-body"),
+    domainError: queryInput<HTMLParagraphElement>("domain-error"),
+    gifPreview: queryInput<HTMLDivElement>("gif-preview"),
+    gifPreviewState: queryInput<HTMLElement>("gif-preview-state"),
   };
+}
+
+function setDomainError(message: string | null) {
+  const { domainError } = getFormElements();
+  if (!domainError) {
+    return;
+  }
+
+  domainError.textContent = message ?? "";
+  domainError.hidden = !message;
+}
+
+function updateGifPreview(showGifs: boolean) {
+  const { gifPreview, gifPreviewState } = getFormElements();
+
+  if (gifPreview) {
+    gifPreview.classList.toggle("gif-preview--off", !showGifs);
+    gifPreview.dataset.state = showGifs ? "on" : "off";
+    gifPreview.setAttribute(
+      "aria-label",
+      showGifs ? "Humorous GIF preview showing a vibrant overlay" : "Humorous GIF preview disabled",
+    );
+  }
+
+  if (gifPreviewState) {
+    gifPreviewState.textContent = showGifs ? "on" : "off";
+  }
+}
+
+async function persistSettings(next: Settings) {
+  try {
+    isSaving = true;
+    const updated = await setSettings(next);
+    applySettingsToForm(updated);
+    await sendStateUpdateMessage();
+  } catch (error) {
+    console.error("Failed to persist settings", error);
+    if (currentSettings) {
+      applySettingsToForm(currentSettings);
+    }
+  } finally {
+    isSaving = false;
+  }
 }
 
 function renderBlocklist(settings: Settings, body: HTMLTableSectionElement) {
@@ -71,7 +118,7 @@ function renderBlocklist(settings: Settings, body: HTMLTableSectionElement) {
   if (domains.length === 0) {
     const emptyRow = document.createElement("tr");
     const emptyCell = document.createElement("td");
-    emptyCell.colSpan = 2;
+    emptyCell.colSpan = 3;
     emptyCell.className = "blocklist-empty";
     emptyCell.textContent = "No distracting sites yet.";
     emptyRow.appendChild(emptyCell);
@@ -89,40 +136,43 @@ function renderBlocklist(settings: Settings, body: HTMLTableSectionElement) {
     domainCell.textContent = domain;
 
     const actionCell = document.createElement("td");
-    actionCell.className = "blocklist-actions";
+    actionCell.className = "blocklist-actions actions";
 
     const toggleButton = document.createElement("button");
     toggleButton.type = "button";
     toggleButton.className = "blocklist-toggle";
     toggleButton.dataset.state = isDisabled ? "disabled" : "enabled";
     toggleButton.textContent = isDisabled ? "Enable" : "Disable";
-    toggleButton.addEventListener("click", async () => {
+    toggleButton.addEventListener("click", () => {
       toggleButton.disabled = true;
-      try {
-        const updated = await mutateSettings((current) => {
-          const disabled = new Set(current.disabledBlocklist ?? []);
-          if (disabled.has(domain)) {
-            disabled.delete(domain);
-          } else {
-            disabled.add(domain);
-          }
-          return {
-            ...current,
-            disabledBlocklist: Array.from(disabled),
-          };
+      handleToggleBlocklist(domain)
+        .catch((error) => console.error("Failed to toggle blocklist domain", error))
+        .finally(() => {
+          toggleButton.disabled = false;
         });
-        applySettingsToForm(updated);
-        await sendStateUpdateMessage();
-      } catch (error) {
-        console.error("Failed to toggle blocklist domain", error);
-      } finally {
-        toggleButton.disabled = false;
-      }
     });
 
     actionCell.appendChild(toggleButton);
+    const removeCell = document.createElement("td");
+    removeCell.className = "actions";
+
+    const removeButton = document.createElement("button");
+    removeButton.type = "button";
+    removeButton.className = "blocklist-remove";
+    removeButton.textContent = "Remove";
+    removeButton.addEventListener("click", () => {
+      removeButton.disabled = true;
+      handleRemoveFromBlocklist(domain)
+        .catch((error) => console.error("Failed to remove blocklist domain", error))
+        .finally(() => {
+          removeButton.disabled = false;
+        });
+    });
+
+    removeCell.appendChild(removeButton);
     row.appendChild(domainCell);
     row.appendChild(actionCell);
+    row.appendChild(removeCell);
     body.appendChild(row);
   });
 }
@@ -152,9 +202,13 @@ function applySettingsToForm(settings: Settings) {
   if (snoozeDuration) snoozeDuration.value = String(settings.reminder.snoozeMinutes);
   if (gifToggle) gifToggle.checked = Boolean(settings.reminder.showGifs);
 
+  updateGifPreview(Boolean(settings.reminder.showGifs));
+
   if (blocklistBody) {
     renderBlocklist(settings, blocklistBody);
   }
+
+  setDomainError(null);
 }
 
 function readSettingsFromForm(): FormSnapshot {
@@ -217,80 +271,158 @@ function readSettingsFromForm(): FormSnapshot {
   };
 }
 
-async function persistSettings(event?: Event) {
-  event?.preventDefault();
-  const formValues = readSettingsFromForm();
-
-  try {
-    const updated = await mutateSettings((settings) => ({
-      ...settings,
-      mode: formValues.mode,
-      schedule: {
-        ...settings.schedule,
-        ...formValues.schedule,
-      },
-      reminder: {
-        ...settings.reminder,
-        ...formValues.reminder,
-      },
-    }));
-
-    applySettingsToForm(updated);
-    await sendStateUpdateMessage();
-  } catch (error) {
-    console.error("Failed to persist settings", error);
-    if (currentSettings) {
-      applySettingsToForm(currentSettings);
-    }
+async function persistFormSnapshot() {
+  if (!currentSettings) {
+    return;
   }
+
+  const snapshot = readSettingsFromForm();
+  const next: Settings = {
+    ...currentSettings,
+    mode: snapshot.mode,
+    schedule: {
+      ...currentSettings.schedule,
+      ...snapshot.schedule,
+    },
+    reminder: {
+      ...currentSettings.reminder,
+      ...snapshot.reminder,
+    },
+  };
+
+  updateGifPreview(snapshot.reminder.showGifs);
+  await persistSettings(next);
+}
+
+async function handleToggleBlocklist(domain: string) {
+  if (!currentSettings) {
+    return;
+  }
+
+  const disabled = new Set(currentSettings.disabledBlocklist ?? []);
+  if (disabled.has(domain)) {
+    disabled.delete(domain);
+  } else {
+    disabled.add(domain);
+  }
+
+  const next: Settings = {
+    ...currentSettings,
+    disabledBlocklist: Array.from(disabled),
+  };
+
+  await persistSettings(next);
+}
+
+async function handleRemoveFromBlocklist(domain: string) {
+  if (!currentSettings) {
+    return;
+  }
+
+  const next: Settings = {
+    ...currentSettings,
+    blocklist: currentSettings.blocklist.filter((entry) => entry !== domain),
+    disabledBlocklist: currentSettings.disabledBlocklist.filter((entry) => entry !== domain),
+  };
+
+  await persistSettings(next);
 }
 
 async function handleBlocklistSubmit(event: SubmitEvent) {
   event.preventDefault();
   const { domainInput } = getFormElements();
-  if (!domainInput) return;
+  if (!currentSettings || !domainInput) {
+    return;
+  }
 
+  setDomainError(null);
   const raw = domainInput.value.trim();
-  if (!raw) return;
+  if (!raw) {
+    setDomainError("Enter a domain to add.");
+    domainInput.focus();
+    return;
+  }
 
   try {
     const parsed = new URL(raw.includes("://") ? raw : `https://${raw}`);
-    const hostname = parsed.hostname.replace(/^www\./, "");
+    const hostname = parsed.hostname.replace(/^www\./, "").toLowerCase();
 
-    const updated = await mutateSettings((settings) => {
-      const alreadyPresent = settings.blocklist.includes(hostname);
-      const blocklist = alreadyPresent ? settings.blocklist : [...settings.blocklist, hostname];
+    if (!hostname) {
+      setDomainError("Please enter a valid domain.");
+      domainInput.focus();
+      return;
+    }
 
-      return {
-        ...settings,
-        blocklist,
-        disabledBlocklist: settings.disabledBlocklist.filter((domain) => domain !== hostname),
-      };
-    });
+    if (currentSettings.blocklist.includes(hostname)) {
+      setDomainError("That domain is already on your list.");
+      domainInput.focus();
+      return;
+    }
 
-    applySettingsToForm(updated);
+    const next: Settings = {
+      ...currentSettings,
+      blocklist: [...currentSettings.blocklist, hostname],
+      disabledBlocklist: currentSettings.disabledBlocklist.filter((domain) => domain !== hostname),
+    };
+
+    await persistSettings(next);
     domainInput.value = "";
-    await sendStateUpdateMessage();
+    setDomainError(null);
   } catch (error) {
     console.error("Invalid URL", error);
+    setDomainError("Please enter a valid domain.");
+    domainInput.focus();
+    domainInput.select();
   }
+}
+
+function registerEventHandlers() {
+  const elements = getFormElements();
+  elements.modeInputs.forEach((input) =>
+    input.addEventListener("change", () => {
+      persistFormSnapshot().catch(console.error);
+    }),
+  );
+  elements.scheduleStart?.addEventListener("change", () => {
+    persistFormSnapshot().catch(console.error);
+  });
+  elements.scheduleEnd?.addEventListener("change", () => {
+    persistFormSnapshot().catch(console.error);
+  });
+  elements.schedulePaused?.addEventListener("change", () => {
+    persistFormSnapshot().catch(console.error);
+  });
+  elements.reminderFrequency?.addEventListener("change", () => {
+    persistFormSnapshot().catch(console.error);
+  });
+  elements.snoozeDuration?.addEventListener("change", () => {
+    persistFormSnapshot().catch(console.error);
+  });
+  elements.gifToggle?.addEventListener("change", () => {
+    updateGifPreview(Boolean(elements.gifToggle?.checked));
+    persistFormSnapshot().catch(console.error);
+  });
+  elements.domainInput?.addEventListener("input", () => {
+    setDomainError(null);
+  });
+  elements.blocklistForm?.addEventListener("submit", (event) => {
+    handleBlocklistSubmit(event).catch(console.error);
+  });
 }
 
 async function bootstrap() {
   const initial = await getSettings();
   applySettingsToForm(initial);
 
-  const elements = getFormElements();
-  elements.modeInputs.forEach((input) => input.addEventListener("change", persistSettings));
-  elements.scheduleStart?.addEventListener("change", persistSettings);
-  elements.scheduleEnd?.addEventListener("change", persistSettings);
-  elements.schedulePaused?.addEventListener("change", persistSettings);
-  elements.reminderFrequency?.addEventListener("change", persistSettings);
-  elements.snoozeDuration?.addEventListener("change", persistSettings);
-  elements.gifToggle?.addEventListener("change", persistSettings);
-  elements.blocklistForm?.addEventListener("submit", handleBlocklistSubmit);
+  registerEventHandlers();
 
-  onSettingsChanged(applySettingsToForm);
+  onSettingsChanged((settings) => {
+    if (isSaving) {
+      currentSettings = settings;
+      return;
+    }
+    applySettingsToForm(settings);
+  });
 }
 
 bootstrap().catch(console.error);

@@ -37,6 +37,14 @@
           <input id="snooze-duration" type="number" min="1" max="60" />
         </label>
         <label><input id="gif-toggle" type="checkbox" /> Show humorous GIFs</label>
+        <div id="gif-preview" class="gif-preview" role="img" aria-live="polite">
+          <div class="gif-preview__media" aria-hidden="true"></div>
+          <div class="gif-preview__content">
+            <p class="gif-preview__eyebrow">Strict mode overlay preview</p>
+            <p class="gif-preview__headline">"Step away from the cat videos!"</p>
+            <p class="gif-preview__caption">GIF flair is currently <strong id="gif-preview-state">on</strong>.</p>
+          </div>
+        </div>
       </section>
       <section>
         <h2>Distracting sites</h2>
@@ -50,6 +58,7 @@
           />
           <button type="submit">Add domain</button>
         </form>
+    <p id="domain-error" class="form-error" role="alert" aria-live="assertive" hidden></p>
         <table class="blocklist-table" aria-live="polite">
           <caption class="sr-only">
             Distracting domains
@@ -58,6 +67,7 @@
             <tr>
               <th scope="col">Domain</th>
               <th scope="col" class="actions">Status</th>
+              <th scope="col" class="actions">Actions</th>
             </tr>
           </thead>
           <tbody id="blocklist-body"></tbody>

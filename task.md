@@ -38,10 +38,10 @@
   - [x] 3.3.1 Design browser action popup layout (status, pause/resume, mode toggle).
   - [x] 3.3.2 Display next reminder countdown and active schedule summary.
   - [x] 3.3.3 Connect popup actions to background service worker via messaging.
-- [ ] **3.4 Options page**
-  - [ ] 3.4.1 Build settings form (mode, schedule, reminder frequency, snooze duration).
-  - [ ] 3.4.2 Implement blocklist management UI (add/remove domains, validation).
-  - [ ] 3.4.3 Add GIF/visual flair toggles with real-time preview.
+- [x] **3.4 Options page**
+  - [x] 3.4.1 Build settings form (mode, schedule, reminder frequency, snooze duration).
+  - [x] 3.4.2 Implement blocklist management UI (add/remove domains, validation).
+  - [x] 3.4.3 Add GIF/visual flair toggles with real-time preview.
 
 ## 4. Assets & Content
 - [ ] **4.1 Curate humorous GIF pack and static fallback images (verify licensing).**
