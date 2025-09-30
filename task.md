@@ -16,10 +16,10 @@
   - [x] 2.1.1 Model single daily focus window and pause toggle.
   - [x] 2.1.2 Wire alarms for start/end of focus period.
   - [x] 2.1.3 Broadcast focus state changes to listeners.
-- [ ] **2.2 Site detection module**
-  - [ ] 2.2.1 Implement wildcard domain matching (including subdomains).
-  - [ ] 2.2.2 Load default blocklist and merge with user overrides.
-  - [ ] 2.2.3 Expose change listener for live updates when blocklist changes.
+- [x] **2.2 Site detection module**
+  - [x] 2.2.1 Implement wildcard domain matching (including subdomains).
+  - [x] 2.2.2 Load default blocklist and merge with user overrides.
+  - [x] 2.2.3 Expose change listener for live updates when blocklist changes.
 - [ ] **2.3 Mode controller**
   - [ ] 2.3.1 Define gentle vs. strict logic branches.
   - [ ] 2.3.2 Handle repetition intervals and snooze expiry.

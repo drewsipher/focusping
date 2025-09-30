@@ -5,6 +5,7 @@ import {
   subscribeToFocusState,
   type FocusState,
 } from "./scheduler";
+import { initializeSiteDetector, subscribeToBlocklist, type BlocklistState } from "./site-detector";
 
 const EXTENSION_NAME = "Focus Ping";
 const HEARTBEAT_ALARM = "focus-ping::heartbeat";
@@ -45,6 +46,35 @@ function handleFocusState(state: FocusState) {
   void applyBadgeState(state);
   void broadcastFocusState(state);
 }
+
+async function broadcastBlocklist(state: BlocklistState, reason: string) {
+  try {
+    await runtime.sendMessage({
+      type: "focus-ping::blocklist-updated",
+      payload: {
+        patterns: state.patterns,
+        updatedAtIso: state.updatedAtIso,
+        version: state.version,
+        reason,
+      },
+    });
+  } catch (error) {
+    if (error instanceof Error && /Receiving end does not exist/.test(error.message)) {
+      return;
+    }
+    console.debug("No active listeners for blocklist broadcast", error);
+  }
+}
+
+initializeSiteDetector()
+  .then((state) => broadcastBlocklist(state, "init"))
+  .catch((error) => {
+    console.error("Failed to initialize site detector", error);
+  });
+
+subscribeToBlocklist((state) => {
+  void broadcastBlocklist(state, "update");
+});
 
 initializeScheduler()
   .then((state) => {
