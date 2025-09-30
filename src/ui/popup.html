@@ -7,15 +7,45 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <main id="app" class="popup">
-      <h1>Focus Ping</h1>
-      <p id="status">Initializing…</p>
-      <button id="toggle" type="button">Pause monitoring</button>
-      <p class="meta">
-        Mode: <span id="mode">Gentle</span><br />
-        Next reminder in <span id="reminder">--</span>
-      </p>
-      <button id="open-options" type="button" class="linkish">Open settings</button>
+    <main id="app" class="popup" aria-live="polite">
+      <header class="popup__header">
+        <h1 class="popup__title">Focus Ping</h1>
+        <span id="status-badge" class="status-badge" data-status="loading">Initializing…</span>
+      </header>
+
+      <section class="popup__section" aria-labelledby="focus-state-heading">
+        <h2 id="focus-state-heading" class="popup__eyebrow">Current status</h2>
+        <p id="status-headline" class="popup__headline">Checking your focus…</p>
+        <p class="popup__subtext">
+          Next reminder
+          <strong id="reminder-countdown">--</strong>
+        </p>
+      </section>
+
+      <section class="popup__section popup__controls" aria-labelledby="focus-controls-heading">
+        <h2 id="focus-controls-heading" class="popup__eyebrow">Controls</h2>
+        <button id="toggle" type="button" class="popup__button">Pause monitoring</button>
+        <div class="mode-toggle" role="radiogroup" aria-label="Intervention mode">
+          <label class="mode-toggle__option">
+            <input id="mode-gentle" type="radio" name="mode" value="gentle" />
+            <span>Gentle</span>
+          </label>
+          <label class="mode-toggle__option">
+            <input id="mode-strict" type="radio" name="mode" value="strict" />
+            <span>Strict</span>
+          </label>
+        </div>
+      </section>
+
+      <section class="popup__section" aria-labelledby="focus-schedule-heading">
+        <h2 id="focus-schedule-heading" class="popup__eyebrow">Focus window</h2>
+        <p id="schedule-summary" class="popup__subtext">--</p>
+        <p id="next-transition" class="popup__subtext">--</p>
+      </section>
+
+      <footer class="popup__footer">
+        <button id="open-options" type="button" class="linkish">Open settings</button>
+      </footer>
     </main>
     <script type="module" src="./popup.ts"></script>
   </body>

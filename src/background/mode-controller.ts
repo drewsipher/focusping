@@ -549,6 +549,22 @@ function registerListeners() {
       return true;
     }
 
+    if (message.type === "focus-ping::command-open-focus-tab") {
+      void tabs
+        .create({})
+        .then(() => sendResponse({ ok: true }))
+        .catch((error) => {
+          console.error("Failed to open focus tab", error);
+          sendResponse({ ok: false });
+        });
+      return true;
+    }
+
+    if (message.type === "focus-ping::request-focus-state") {
+      sendResponse({ ok: true, state: getCurrentFocusState() });
+      return true;
+    }
+
     return undefined;
   });
 }

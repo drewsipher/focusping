@@ -26,18 +26,18 @@
   - [x] 2.3.3 Integrate with scheduler and site detector to avoid false positives.
 
 ## 3. User Interface & Interaction
-- [ ] **3.1 Gentle toast UI**
-  - [ ] 3.1.1 Build toast component with shadow DOM isolation.
-  - [ ] 3.1.2 Add dismiss, repeat timer display, and accessibility labels.
-  - [ ] 3.1.3 Style with vibrant theme and optional GIF slot.
-- [ ] **3.2 Strict overlay UI**
-  - [ ] 3.2.1 Create full-screen overlay with snooze + switch-tab prompts.
-  - [ ] 3.2.2 Implement humorous GIF/message rotation with fallback static art.
-  - [ ] 3.2.3 Ensure keyboard navigation and screen reader support.
-- [ ] **3.3 Popup & status indicator**
-  - [ ] 3.3.1 Design browser action popup layout (status, pause/resume, mode toggle).
-  - [ ] 3.3.2 Display next reminder countdown and active schedule summary.
-  - [ ] 3.3.3 Connect popup actions to background service worker via messaging.
+- [x] **3.1 Gentle toast UI**
+  - [x] 3.1.1 Build toast component with shadow DOM isolation.
+  - [x] 3.1.2 Add dismiss, repeat timer display, and accessibility labels.
+  - [x] 3.1.3 Style with vibrant theme and optional GIF slot.
+- [x] **3.2 Strict overlay UI**
+  - [x] 3.2.1 Create full-screen overlay with snooze + switch-tab prompts.
+  - [x] 3.2.2 Implement humorous GIF/message rotation with fallback static art.
+  - [x] 3.2.3 Ensure keyboard navigation and screen reader support.
+- [x] **3.3 Popup & status indicator**
+  - [x] 3.3.1 Design browser action popup layout (status, pause/resume, mode toggle).
+  - [x] 3.3.2 Display next reminder countdown and active schedule summary.
+  - [x] 3.3.3 Connect popup actions to background service worker via messaging.
 - [ ] **3.4 Options page**
   - [ ] 3.4.1 Build settings form (mode, schedule, reminder frequency, snooze duration).
   - [ ] 3.4.2 Implement blocklist management UI (add/remove domains, validation).

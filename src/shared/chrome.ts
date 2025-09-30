@@ -78,6 +78,13 @@ function createTabHelpers() {
   assertChromeApi();
 
   return {
+    create(createProperties?: chrome.tabs.CreateProperties): Promise<chrome.tabs.Tab> {
+      return createPromise((resolve, reject) => {
+        chrome.tabs.create(createProperties ?? {}, (tab) =>
+          withLastError(resolve, reject, tab as chrome.tabs.Tab),
+        );
+      });
+    },
     query(queryInfo: TabQueryInfo): Promise<chrome.tabs.Tab[]> {
       return createPromise((resolve, reject) => {
         chrome.tabs.query(queryInfo, (tabs) => withLastError(resolve, reject, tabs));
