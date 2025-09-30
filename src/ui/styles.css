@@ -30,6 +30,79 @@ body {
   );
 }
 
+.options section {
+  margin-bottom: var(--spacing-lg);
+}
+
+.blocklist-form {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: center;
+  margin-top: var(--spacing-sm);
+}
+
+.blocklist-form input {
+  flex: 1;
+  border: 1px solid rgba(17, 24, 39, 0.2);
+  border-radius: var(--radius-pill);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: 0.95rem;
+}
+
+.blocklist-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: var(--spacing-md);
+}
+
+.blocklist-table th,
+.blocklist-table td {
+  padding: var(--spacing-sm) var(--spacing-md);
+  text-align: left;
+}
+
+.blocklist-table thead {
+  border-bottom: 1px solid rgba(17, 24, 39, 0.15);
+}
+
+.blocklist-table tbody tr[data-disabled="true"] {
+  opacity: 0.55;
+}
+
+.blocklist-domain {
+  font-weight: 500;
+}
+
+.blocklist-actions {
+  text-align: right;
+  width: 1%;
+  white-space: nowrap;
+}
+
+button.blocklist-toggle {
+  margin-top: 0;
+  min-width: 96px;
+}
+
+.blocklist-empty {
+  text-align: center;
+  font-style: italic;
+  color: var(--color-text-secondary);
+  padding: var(--spacing-md);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .popup {
   background: var(--color-surface-light);
   border-radius: var(--radius-medium);
@@ -95,5 +168,15 @@ button:hover {
 
   .meta {
     color: var(--color-text-on-dark);
+  }
+
+  .blocklist-form input {
+    border-color: rgba(249, 250, 251, 0.35);
+    background: rgba(15, 23, 42, 0.5);
+    color: var(--color-text-on-dark);
+  }
+
+  .blocklist-table thead {
+    border-color: rgba(249, 250, 251, 0.2);
   }
 }

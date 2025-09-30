@@ -5,7 +5,7 @@ export type Mode = "gentle" | "strict";
 
 const SETTINGS_STORAGE_KEY = "focusPing::settings";
 const SESSION_STORAGE_KEY = "focusPing::session";
-const CURRENT_SETTINGS_VERSION = 1;
+const CURRENT_SETTINGS_VERSION = 2;
 const CURRENT_SESSION_VERSION = 1;
 
 export interface ScheduleSettings {
@@ -29,6 +29,7 @@ export interface Settings {
   reminder: ReminderSettings;
   blocklist: string[];
   blocklistVersion: number;
+  disabledBlocklist: string[];
 }
 
 export interface SessionState {
@@ -56,6 +57,7 @@ const DEFAULT_SETTINGS: Settings = {
   },
   blocklist: DEFAULT_DISTRACTION_DOMAINS,
   blocklistVersion: CURRENT_SETTINGS_VERSION,
+  disabledBlocklist: [],
 };
 
 const DEFAULT_SESSION_STATE: SessionState = {
@@ -97,10 +99,18 @@ function migrateSettings(payload: Partial<Settings> | undefined): Settings {
       ...(payload.reminder ?? {}),
     },
     blocklist: normalizeDomainList(payload.blocklist ?? DEFAULT_SETTINGS.blocklist),
+    disabledBlocklist: normalizeDomainList(
+      (payload.disabledBlocklist ?? DEFAULT_SETTINGS.disabledBlocklist).filter((domain) =>
+        (payload.blocklist ?? DEFAULT_SETTINGS.blocklist).includes(domain),
+      ),
+    ),
   };
 
   withDefaults.version = CURRENT_SETTINGS_VERSION;
   withDefaults.blocklistVersion = payload.blocklistVersion ?? DEFAULT_SETTINGS.blocklistVersion;
+  withDefaults.disabledBlocklist = withDefaults.disabledBlocklist.filter((domain) =>
+    withDefaults.blocklist.includes(domain),
+  );
 
   return withDefaults;
 }
@@ -128,6 +138,9 @@ function normalizeSettings(settings: Settings): Settings {
     version: CURRENT_SETTINGS_VERSION,
     blocklist: normalizeDomainList(settings.blocklist),
     blocklistVersion: settings.blocklistVersion ?? CURRENT_SETTINGS_VERSION,
+    disabledBlocklist: normalizeDomainList(
+      settings.disabledBlocklist.filter((domain) => settings.blocklist.includes(domain)),
+    ),
   };
 }
 

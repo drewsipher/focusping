@@ -26,6 +26,28 @@ const queryInput = <ElementType extends HTMLElement>(id: string) => {
   return document.getElementById(id) as ElementType | null;
 };
 
+let currentSettings: Settings | null = null;
+
+function isMissingReceiverError(error: unknown) {
+  return (
+    error instanceof Error &&
+    (/Receiving end does not exist/.test(error.message) ||
+      /The message port closed before a response was received/.test(error.message))
+  );
+}
+
+async function sendStateUpdateMessage() {
+  try {
+    await runtime.sendMessage({ type: "focus-ping::state-updated" });
+  } catch (error) {
+    if (isMissingReceiverError(error)) {
+      console.debug("No runtime listeners for state update", error);
+      return;
+    }
+    console.error("Failed to broadcast state update", error);
+  }
+}
+
 function getFormElements() {
   return {
     modeInputs: Array.from(document.querySelectorAll<HTMLInputElement>("input[name='mode']")),
@@ -37,33 +59,76 @@ function getFormElements() {
     gifToggle: queryInput<HTMLInputElement>("gif-toggle"),
     blocklistForm: queryInput<HTMLFormElement>("blocklist-form"),
     domainInput: queryInput<HTMLInputElement>("domain-input"),
-    blocklist: queryInput<HTMLUListElement>("blocklist"),
+    blocklistBody: queryInput<HTMLTableSectionElement>("blocklist-body"),
   };
 }
 
-function renderBlocklist(items: string[], listEl: HTMLUListElement) {
-  listEl.innerHTML = "";
-  items.forEach((domain) => {
-    const li = document.createElement("li");
-    li.textContent = domain;
+function renderBlocklist(settings: Settings, body: HTMLTableSectionElement) {
+  body.innerHTML = "";
+  const disabledSet = new Set(settings.disabledBlocklist ?? []);
+  const domains = [...settings.blocklist].sort((a, b) => a.localeCompare(b));
 
-    const removeButton = document.createElement("button");
-    removeButton.textContent = "Remove";
-    removeButton.type = "button";
-    removeButton.addEventListener("click", async () => {
-      const updated = await mutateSettings((settings) => ({
-        ...settings,
-        blocklist: settings.blocklist.filter((value) => value !== domain),
-      }));
-      applySettingsToForm(updated);
+  if (domains.length === 0) {
+    const emptyRow = document.createElement("tr");
+    const emptyCell = document.createElement("td");
+    emptyCell.colSpan = 2;
+    emptyCell.className = "blocklist-empty";
+    emptyCell.textContent = "No distracting sites yet.";
+    emptyRow.appendChild(emptyCell);
+    body.appendChild(emptyRow);
+    return;
+  }
+
+  domains.forEach((domain) => {
+    const row = document.createElement("tr");
+    const isDisabled = disabledSet.has(domain);
+    row.dataset.disabled = isDisabled ? "true" : "false";
+
+    const domainCell = document.createElement("td");
+    domainCell.className = "blocklist-domain";
+    domainCell.textContent = domain;
+
+    const actionCell = document.createElement("td");
+    actionCell.className = "blocklist-actions";
+
+    const toggleButton = document.createElement("button");
+    toggleButton.type = "button";
+    toggleButton.className = "blocklist-toggle";
+    toggleButton.dataset.state = isDisabled ? "disabled" : "enabled";
+    toggleButton.textContent = isDisabled ? "Enable" : "Disable";
+    toggleButton.addEventListener("click", async () => {
+      toggleButton.disabled = true;
+      try {
+        const updated = await mutateSettings((current) => {
+          const disabled = new Set(current.disabledBlocklist ?? []);
+          if (disabled.has(domain)) {
+            disabled.delete(domain);
+          } else {
+            disabled.add(domain);
+          }
+          return {
+            ...current,
+            disabledBlocklist: Array.from(disabled),
+          };
+        });
+        applySettingsToForm(updated);
+        await sendStateUpdateMessage();
+      } catch (error) {
+        console.error("Failed to toggle blocklist domain", error);
+      } finally {
+        toggleButton.disabled = false;
+      }
     });
 
-    li.appendChild(removeButton);
-    listEl.appendChild(li);
+    actionCell.appendChild(toggleButton);
+    row.appendChild(domainCell);
+    row.appendChild(actionCell);
+    body.appendChild(row);
   });
 }
 
 function applySettingsToForm(settings: Settings) {
+  currentSettings = settings;
   const {
     modeInputs,
     scheduleStart,
@@ -72,7 +137,7 @@ function applySettingsToForm(settings: Settings) {
     reminderFrequency,
     snoozeDuration,
     gifToggle,
-    blocklist,
+    blocklistBody,
   } = getFormElements();
 
   modeInputs.forEach((input) => {
@@ -81,13 +146,14 @@ function applySettingsToForm(settings: Settings) {
 
   if (scheduleStart) scheduleStart.value = settings.schedule.start;
   if (scheduleEnd) scheduleEnd.value = settings.schedule.end;
-  if (schedulePaused) schedulePaused.checked = settings.schedule.pausedOutsideSchedule;
-  if (reminderFrequency) reminderFrequency.valueAsNumber = settings.reminder.frequencyMinutes;
-  if (snoozeDuration) snoozeDuration.valueAsNumber = settings.reminder.snoozeMinutes;
-  if (gifToggle) gifToggle.checked = settings.reminder.showGifs;
+  if (schedulePaused) schedulePaused.checked = Boolean(settings.schedule.pausedOutsideSchedule);
 
-  if (blocklist) {
-    renderBlocklist(settings.blocklist, blocklist);
+  if (reminderFrequency) reminderFrequency.value = String(settings.reminder.frequencyMinutes);
+  if (snoozeDuration) snoozeDuration.value = String(settings.reminder.snoozeMinutes);
+  if (gifToggle) gifToggle.checked = Boolean(settings.reminder.showGifs);
+
+  if (blocklistBody) {
+    renderBlocklist(settings, blocklistBody);
   }
 }
 
@@ -105,9 +171,36 @@ function readSettingsFromForm(): FormSnapshot {
   const mode = (modeInputs.find((input) => input.checked)?.value as Mode | undefined) ?? "gentle";
 
   const safeNumber = (input: HTMLInputElement | null, fallback: number) => {
-    const value = input?.valueAsNumber;
-    return Number.isFinite(value) && value !== null ? (value as number) : fallback;
+    if (!input) {
+      return fallback;
+    }
+
+    const trimmed = input.value.trim();
+    const candidate = Number.isNaN(input.valueAsNumber) ? undefined : input.valueAsNumber;
+    const parsed = candidate ?? (trimmed ? Number.parseFloat(trimmed) : undefined);
+
+    if (typeof parsed !== "number" || Number.isNaN(parsed)) {
+      return fallback;
+    }
+
+    const min = input.min !== "" ? Number.parseFloat(input.min) : undefined;
+    const max = input.max !== "" ? Number.parseFloat(input.max) : undefined;
+
+    let clamped = parsed;
+    if (typeof min === "number" && Number.isFinite(min)) {
+      clamped = Math.max(clamped, min);
+    }
+    if (typeof max === "number" && Number.isFinite(max)) {
+      clamped = Math.min(clamped, max);
+    }
+
+    return clamped;
   };
+
+  const baselineReminder =
+    currentSettings?.reminder.frequencyMinutes ?? defaults.settings.reminder.frequencyMinutes;
+  const baselineSnooze =
+    currentSettings?.reminder.snoozeMinutes ?? defaults.settings.reminder.snoozeMinutes;
 
   return {
     mode,
@@ -117,8 +210,8 @@ function readSettingsFromForm(): FormSnapshot {
       pausedOutsideSchedule: Boolean(schedulePaused?.checked),
     },
     reminder: {
-      frequencyMinutes: safeNumber(reminderFrequency, defaults.settings.reminder.frequencyMinutes),
-      snoozeMinutes: safeNumber(snoozeDuration, defaults.settings.reminder.snoozeMinutes),
+      frequencyMinutes: safeNumber(reminderFrequency, baselineReminder),
+      snoozeMinutes: safeNumber(snoozeDuration, baselineSnooze),
       showGifs: Boolean(gifToggle?.checked),
     },
   };
@@ -127,21 +220,29 @@ function readSettingsFromForm(): FormSnapshot {
 async function persistSettings(event?: Event) {
   event?.preventDefault();
   const formValues = readSettingsFromForm();
-  const updated = await mutateSettings((settings) => ({
-    ...settings,
-    mode: formValues.mode,
-    schedule: {
-      ...settings.schedule,
-      ...formValues.schedule,
-    },
-    reminder: {
-      ...settings.reminder,
-      ...formValues.reminder,
-    },
-  }));
 
-  applySettingsToForm(updated);
-  await runtime.sendMessage({ type: "focus-ping::state-updated" });
+  try {
+    const updated = await mutateSettings((settings) => ({
+      ...settings,
+      mode: formValues.mode,
+      schedule: {
+        ...settings.schedule,
+        ...formValues.schedule,
+      },
+      reminder: {
+        ...settings.reminder,
+        ...formValues.reminder,
+      },
+    }));
+
+    applySettingsToForm(updated);
+    await sendStateUpdateMessage();
+  } catch (error) {
+    console.error("Failed to persist settings", error);
+    if (currentSettings) {
+      applySettingsToForm(currentSettings);
+    }
+  }
 }
 
 async function handleBlocklistSubmit(event: SubmitEvent) {
@@ -155,18 +256,21 @@ async function handleBlocklistSubmit(event: SubmitEvent) {
   try {
     const parsed = new URL(raw.includes("://") ? raw : `https://${raw}`);
     const hostname = parsed.hostname.replace(/^www\./, "");
+
     const updated = await mutateSettings((settings) => {
-      if (settings.blocklist.includes(hostname)) {
-        return settings;
-      }
+      const alreadyPresent = settings.blocklist.includes(hostname);
+      const blocklist = alreadyPresent ? settings.blocklist : [...settings.blocklist, hostname];
+
       return {
         ...settings,
-        blocklist: [...settings.blocklist, hostname],
+        blocklist,
+        disabledBlocklist: settings.disabledBlocklist.filter((domain) => domain !== hostname),
       };
     });
+
     applySettingsToForm(updated);
     domainInput.value = "";
-    await runtime.sendMessage({ type: "focus-ping::state-updated" });
+    await sendStateUpdateMessage();
   } catch (error) {
     console.error("Invalid URL", error);
   }

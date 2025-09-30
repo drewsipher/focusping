@@ -40,11 +40,28 @@
       </section>
       <section>
         <h2>Distracting sites</h2>
-        <form id="blocklist-form">
-          <input id="domain-input" type="url" placeholder="https://example.com" />
+        <form id="blocklist-form" class="blocklist-form">
+          <input
+            id="domain-input"
+            type="url"
+            inputmode="url"
+            autocomplete="off"
+            placeholder="https://example.com"
+          />
           <button type="submit">Add domain</button>
         </form>
-        <ul id="blocklist"></ul>
+        <table class="blocklist-table" aria-live="polite">
+          <caption class="sr-only">
+            Distracting domains
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Domain</th>
+              <th scope="col" class="actions">Status</th>
+            </tr>
+          </thead>
+          <tbody id="blocklist-body"></tbody>
+        </table>
       </section>
     </main>
     <script type="module" src="./options.ts"></script>
