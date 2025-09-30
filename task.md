@@ -20,10 +20,10 @@
   - [x] 2.2.1 Implement wildcard domain matching (including subdomains).
   - [x] 2.2.2 Load default blocklist and merge with user overrides.
   - [x] 2.2.3 Expose change listener for live updates when blocklist changes.
-- [ ] **2.3 Mode controller**
-  - [ ] 2.3.1 Define gentle vs. strict logic branches.
-  - [ ] 2.3.2 Handle repetition intervals and snooze expiry.
-  - [ ] 2.3.3 Integrate with scheduler and site detector to avoid false positives.
+- [x] **2.3 Mode controller**
+  - [x] 2.3.1 Define gentle vs. strict logic branches.
+  - [x] 2.3.2 Handle repetition intervals and snooze expiry.
+  - [x] 2.3.3 Integrate with scheduler and site detector to avoid false positives.
 
 ## 3. User Interface & Interaction
 - [ ] **3.1 Gentle toast UI**

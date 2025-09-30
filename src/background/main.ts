@@ -6,6 +6,7 @@ import {
   type FocusState,
 } from "./scheduler";
 import { initializeSiteDetector, subscribeToBlocklist, type BlocklistState } from "./site-detector";
+import { initializeModeController } from "./mode-controller";
 
 const EXTENSION_NAME = "Focus Ping";
 const HEARTBEAT_ALARM = "focus-ping::heartbeat";
@@ -74,6 +75,10 @@ initializeSiteDetector()
 
 subscribeToBlocklist((state) => {
   void broadcastBlocklist(state, "update");
+});
+
+initializeModeController().catch((error) => {
+  console.error("Failed to initialize mode controller", error);
 });
 
 initializeScheduler()
