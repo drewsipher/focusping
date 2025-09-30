@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Focus Ping Settings</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="options">
+      <h1>Focus Ping Settings</h1>
+      <section>
+        <h2>Mode</h2>
+        <label><input type="radio" name="mode" value="gentle" /> Gentle</label>
+        <label><input type="radio" name="mode" value="strict" /> Strict</label>
+      </section>
+      <section>
+        <h2>Focus schedule</h2>
+        <label>
+          Start
+          <input id="schedule-start" type="time" />
+        </label>
+        <label>
+          End
+          <input id="schedule-end" type="time" />
+        </label>
+        <label><input id="schedule-paused" type="checkbox" /> Pause outside schedule</label>
+      </section>
+      <section>
+        <h2>Reminder behavior</h2>
+        <label>
+          Reminder cadence (minutes)
+          <input id="reminder-frequency" type="number" min="1" max="60" />
+        </label>
+        <label>
+          Snooze duration (minutes)
+          <input id="snooze-duration" type="number" min="1" max="60" />
+        </label>
+        <label><input id="gif-toggle" type="checkbox" /> Show humorous GIFs</label>
+      </section>
+      <section>
+        <h2>Distracting sites</h2>
+        <form id="blocklist-form">
+          <input id="domain-input" type="url" placeholder="https://example.com" />
+          <button type="submit">Add domain</button>
+        </form>
+        <ul id="blocklist"></ul>
+      </section>
+    </main>
+    <script type="module" src="./options.ts"></script>
+  </body>
+</html>

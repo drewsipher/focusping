@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Focus Ping</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main id="app" class="popup">
+      <h1>Focus Ping</h1>
+      <p id="status">Initializing…</p>
+      <button id="toggle" type="button">Pause monitoring</button>
+      <p class="meta">
+        Mode: <span id="mode">Gentle</span><br />
+        Next reminder in <span id="reminder">--</span>
+      </p>
+      <button id="open-options" type="button" class="linkish">Open settings</button>
+    </main>
+    <script type="module" src="./popup.ts"></script>
+  </body>
+</html>
