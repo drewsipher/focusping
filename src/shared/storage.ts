@@ -3,8 +3,8 @@ import { DEFAULT_DISTRACTION_DOMAINS } from "@/shared/blocklist";
 
 export type Mode = "gentle" | "strict";
 
-const SETTINGS_STORAGE_KEY = "focusping::settings";
-const SESSION_STORAGE_KEY = "focusping::session";
+const SETTINGS_STORAGE_KEY = "settings";
+const SESSION_STORAGE_KEY = "session";
 const CURRENT_SETTINGS_VERSION = 2;
 const CURRENT_SESSION_VERSION = 1;
 
@@ -149,9 +149,15 @@ export async function getSettings(): Promise<Settings> {
     SETTINGS_STORAGE_KEY,
     undefined,
   );
-  const migrated = migrateSettings(stored);
-  await chromeStorage.sync.set(SETTINGS_STORAGE_KEY, migrated);
-  return migrated;
+  
+  // Only write back if settings don't exist or need migration
+  if (!stored || stored.version !== CURRENT_SETTINGS_VERSION) {
+    const migrated = migrateSettings(stored);
+    await chromeStorage.sync.set(SETTINGS_STORAGE_KEY, migrated);
+    return migrated;
+  }
+  
+  return stored;
 }
 
 export async function setSettings(next: Settings): Promise<Settings> {

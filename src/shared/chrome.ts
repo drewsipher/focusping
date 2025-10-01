@@ -37,6 +37,14 @@ function createPromise<T>(
   });
 }
 
+export interface StorageHelpers {
+  get<T>(key: string, fallback: T): Promise<T>;
+  set<T>(key: string, value: T): Promise<void>;
+  remove(key: string | string[]): Promise<void>;
+  clear(): Promise<void>;
+  watch<T>(key: string, callback: (newValue: T, areaName: StorageAreaName) => void): () => void;
+}
+
 function createStorageArea(areaName: StorageAreaName) {
   assertChromeApi();
   const area = chrome.storage[areaName];
@@ -44,14 +52,22 @@ function createStorageArea(areaName: StorageAreaName) {
   return {
     get<T>(key: string, fallback: T): Promise<T> {
       return createPromise<T>((resolve, reject) => {
-        area.get({ [key]: fallback } as StorageGetReturn<typeof key>, (result) => {
-          withLastError(resolve, reject, (result?.[key] as T) ?? fallback);
+        console.log("chrome storage get", areaName, key, "fallback:", fallback);
+        area.get(key, (result) => {
+          console.log("chrome storage get result", areaName, key, "result:", result);
+          const value = result?.[key];
+          const finalValue = (value !== undefined && value !== null) ? value as T : fallback;
+          withLastError(resolve, reject, finalValue);
         });
       });
     },
     set<T>(key: string, value: T): Promise<void> {
       return createPromise<void>((resolve, reject) => {
-        area.set({ [key]: value }, () => withLastError(resolve, reject, undefined));
+        console.log("chrome storage set", areaName, key, "value:", value);
+        area.set({ [key]: value }, () => {
+          console.log("chrome storage set completed", areaName, key);
+          withLastError(resolve, reject, undefined);
+        });
       });
     },
     remove(key: string | string[]): Promise<void> {
@@ -65,13 +81,28 @@ function createStorageArea(areaName: StorageAreaName) {
       });
     },
     watch<T>(key: string, callback: (newValue: T, areaName: StorageAreaName) => void) {
-      chrome.storage.onChanged.addListener((changes, area) => {
-        if (area === areaName && changes[key]) {
+      const listener = (changes: Record<string, chrome.storage.StorageChange>, changedArea: string) => {
+        if (changedArea === areaName && changes[key]) {
           callback(changes[key].newValue as T, areaName);
         }
-      });
+      };
+      
+      chrome.storage.onChanged.addListener(listener);
+      
+      // Return unsubscribe function
+      return () => {
+        chrome.storage.onChanged.removeListener(listener);
+      };
     },
   };
+}
+
+export interface StorageHelpers {
+  get<T>(key: string, fallback: T): Promise<T>;
+  set<T>(key: string, value: T): Promise<void>;
+  remove(key: string | string[]): Promise<void>;
+  clear(): Promise<void>;
+  watch<T>(key: string, callback: (newValue: T, areaName: StorageAreaName) => void): () => void;
 }
 
 function createTabHelpers() {
