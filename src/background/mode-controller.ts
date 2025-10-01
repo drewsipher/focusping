@@ -98,7 +98,8 @@ async function clearSnoozeExpiry(domain: string) {
 }
 
 function handleMissingListener(error: unknown) {
-  console.log("[Mode Controller] Message send failed:", error);
+  // Keep an informational message but avoid noisy stack traces in normal flows.
+  console.info("[Mode Controller] Message send failed:", error instanceof Error ? error.message : error);
 }
 
 // Try to inject the content script into a tab and return a promise that
@@ -110,26 +111,62 @@ async function injectContentScriptToTab(tabId: number) {
     const scripting = (chrome as any).scripting;
     if (!scripting || typeof scripting.executeScript !== "function") {
       console.warn(
-        "[Mode Controller] chrome.scripting.executeScript is not available in this environment.\n" +
-          "Ensure you are running a Chrome/Chromium version that supports the 'scripting' API with MV3, and that the manifest includes the 'scripting' permission.\n" +
-          "Falling back to asking the user to reload the page to load the content script.",
+        "[Mode Controller] chrome.scripting.executeScript is not available in this environment. Ensure the manifest includes 'scripting' permission.",
       );
       return false;
     }
 
-    console.debug("[Mode Controller] Injecting content script into tab", tabId);
-    // The built content script is `content.js` in the extension root (dist).
-    // Use the scripting API to execute the script in the target tab.
-    await scripting.executeScript({
-      target: { tabId },
-      files: ["content.js"],
+    // Fetch the tab URL so we can check whether we have host permission for it.
+    const tab = await new Promise<chrome.tabs.Tab | undefined>((resolve) => {
+      try {
+        chrome.tabs.get(tabId, (t) => resolve(t as chrome.tabs.Tab | undefined));
+      } catch (e) {
+        resolve(undefined);
+      }
     });
+
+    const tabUrl = tab?.url;
+    if (!tabUrl) {
+      console.warn("[Mode Controller] Cannot determine tab URL for injection; skipping.");
+      return false;
+    }
+
+    let origin: string;
+    try {
+      origin = new URL(tabUrl).origin;
+    } catch (e) {
+      console.warn("[Mode Controller] Could not parse tab URL; skipping injection", tabUrl);
+      return false;
+    }
+
+    // Check whether we have permission for this origin.
+    const hasHostPermission = await new Promise<boolean>((resolve) => {
+      try {
+        (chrome as any).permissions.contains({ origins: [origin + "/*"] }, (granted: boolean) =>
+          resolve(Boolean(granted)),
+        );
+      } catch (e) {
+        resolve(false);
+      }
+    });
+
+    if (!hasHostPermission) {
+      console.debug(
+        "[Mode Controller] No host permission for",
+        origin,
+        "; not attempting injection. To allow injection, add this origin to manifest host_permissions.",
+      );
+      return false;
+    }
+
+    console.debug("[Mode Controller] Injecting content script into tab", tabId, "for origin", origin);
+    await scripting.executeScript({ target: { tabId }, files: ["content.js"] });
     // Give the content script a short moment to initialize.
     await new Promise((r) => setTimeout(r, 150));
     console.debug("[Mode Controller] Injection attempted for tab", tabId);
     return true;
   } catch (err) {
-    console.warn("[Mode Controller] Content script injection failed", err);
+    console.warn("[Mode Controller] Content script injection failed", err instanceof Error ? err.message : err);
     return false;
   }
 }
@@ -150,7 +187,7 @@ async function sendGentleIntervention(
   };
 
   try {
-    console.debug("[Mode Controller] Sending gentle intervention to tab", tabId, payload);
+  console.debug("[Mode Controller] Sending gentle intervention to tab", tabId);
     await tabs.sendMessage(tabId, {
       type: "focus-ping::gentle-intervention",
       payload,
@@ -178,10 +215,8 @@ async function sendGentleIntervention(
   }
 
   try {
-    console.debug("[Mode Controller] Sending gentle intervention via runtime to listeners", {
-      tabId,
-      payload: { ...payload, tabId },
-    });
+    // Broadcast to any runtime listeners (best-effort)
+    console.debug("[Mode Controller] Broadcasting gentle intervention (runtime)", tabId);
     await runtime.sendMessage({
       type: "focus-ping::gentle-intervention",
       payload: { ...payload, tabId },
@@ -206,7 +241,7 @@ async function sendStrictIntervention(
   };
 
   try {
-    console.debug("[Mode Controller] Sending strict intervention to tab", tabId, payload);
+  console.debug("[Mode Controller] Sending strict intervention to tab", tabId);
     await tabs.sendMessage(tabId, {
       type: "focus-ping::strict-intervention",
       payload,
@@ -232,10 +267,7 @@ async function sendStrictIntervention(
   }
 
   try {
-    console.debug("[Mode Controller] Sending strict intervention via runtime to listeners", {
-      tabId,
-      payload: { ...payload, tabId },
-    });
+    console.debug("[Mode Controller] Broadcasting strict intervention (runtime)", tabId);
     await runtime.sendMessage({
       type: "focus-ping::strict-intervention",
       payload: { ...payload, tabId },
@@ -248,7 +280,7 @@ async function sendStrictIntervention(
 
 async function sendClearIntervention(tabId: number, reason: string) {
   try {
-    console.debug("[Mode Controller] Sending clear intervention to tab", tabId, reason);
+  console.debug("[Mode Controller] Sending clear intervention to tab", tabId);
     await tabs.sendMessage(tabId, {
       type: "focus-ping::clear-intervention",
       payload: { reason },
@@ -274,10 +306,7 @@ async function sendClearIntervention(tabId: number, reason: string) {
   }
 
   try {
-    console.debug("[Mode Controller] Sending clear intervention via runtime to listeners", {
-      tabId,
-      reason,
-    });
+    console.debug("[Mode Controller] Broadcasting clear intervention (runtime)", tabId);
     await runtime.sendMessage({
       type: "focus-ping::clear-intervention",
       payload: { reason, tabId },

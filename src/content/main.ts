@@ -121,15 +121,13 @@ chrome.runtime.onMessage.addListener((message) => {
   }
 });
 
-// Notify background that the content script is present in this tab. This helps when the
-// extension is (re)loaded while pages are already open — the background may have
-// already decided an intervention but the content script wasn't injected yet. Sending
-// this lets the background re-send any active intervention for this tab immediately.
-void runtime
-  .sendMessage({ type: "focus-ping::content-ready" })
-  .then((response) => {
-    console.debug(`[${CONTENT_NAMESPACE}] content-ready acknowledged by background`, response);
-  })
-  .catch((error) => {
-    console.warn(`[${CONTENT_NAMESPACE}] content-ready send failed`, error);
+// Notify background that the content script is present in this tab. Fire-and-forget
+// so we don't await a response (background may not send one), which avoids the
+// "message port closed before a response was received" rejection in some cases.
+try {
+  chrome.runtime.sendMessage({ type: "focus-ping::content-ready" }, () => {
+    // intentionally empty callback to avoid leaving the message port open
   });
+} catch (e) {
+  // best-effort — ignore any synchronous errors
+}
