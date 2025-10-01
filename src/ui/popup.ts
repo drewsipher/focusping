@@ -22,6 +22,7 @@ interface Elements {
 let elements: Elements;
 let currentSettings: Settings | null = null;
 let currentTab: chrome.tabs.Tab | null = null;
+let isCurrentTabOnWatchlist = false;
 
 function collectElements(): Elements {
   return {
@@ -78,6 +79,15 @@ function getStatusInfo(
     };
   }
 
+  // Check if the current tab is on the watchlist
+  if (!isCurrentTabOnWatchlist) {
+    return {
+      status: "idle",
+      title: "Not Monitoring",
+      message: "Current site is not on your watch list",
+    };
+  }
+
   if (!focusState.isMonitoring) {
     return {
       status: "idle",
@@ -119,15 +129,22 @@ function updateControls(settings: Settings) {
   }
 
   if (elements.reminderFrequency) {
-    elements.reminderFrequency.value = String(settings.reminder.frequencyMinutes);
+    // Convert minutes to seconds for the slider
+    const seconds = Math.round(settings.reminder.frequencyMinutes * 60);
+    elements.reminderFrequency.value = String(seconds);
   }
 
-  updateReminderValue(settings.reminder.frequencyMinutes);
+  updateReminderValueFromSeconds(Math.round(settings.reminder.frequencyMinutes * 60));
 }
 
-function updateReminderValue(minutes: number) {
+function updateReminderValueFromSeconds(seconds: number) {
   if (elements.reminderValue) {
-    elements.reminderValue.textContent = `${minutes} min`;
+    if (seconds < 60) {
+      elements.reminderValue.textContent = `${seconds} sec`;
+    } else {
+      const minutes = seconds / 60;
+      elements.reminderValue.textContent = `${minutes.toFixed(1)} min`;
+    }
   }
 }
 
@@ -146,6 +163,34 @@ function extractBaseDomain(hostname: string): string {
     return parts.slice(-2).join(".");
   }
   return hostname;
+}
+
+function isUrlOnWatchlist(url: string | undefined, blocklist: string[]): boolean {
+  if (!url) return false;
+
+  const domain = extractDomain(url);
+  if (!domain) return false;
+
+  // Check if domain or any parent domain matches the blocklist
+  for (const entry of blocklist) {
+    // Exact match
+    if (domain === entry) return true;
+
+    // Wildcard match (e.g., *.example.com matches subdomain.example.com)
+    if (entry.startsWith("*.")) {
+      const baseDomain = entry.substring(2);
+      if (domain === baseDomain || domain.endsWith("." + baseDomain)) {
+        return true;
+      }
+    }
+
+    // Check if domain ends with the entry (for subdomain matching)
+    if (domain.endsWith("." + entry)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function showAddSiteModal() {
@@ -218,7 +263,8 @@ async function handleReminderFrequencyChange(minutes: number) {
   };
   await setSettings(updated);
   currentSettings = updated;
-  updateReminderValue(minutes);
+  const seconds = Math.round(minutes * 60);
+  updateReminderValueFromSeconds(seconds);
 }
 
 async function loadFocusState(): Promise<FocusState | null> {
@@ -240,6 +286,11 @@ async function bootstrap() {
     currentSettings = await getSettings();
     const activeTab = await tabs.getActive();
     currentTab = activeTab || null;
+
+    // Check if current tab is on the watchlist
+    if (currentSettings && currentTab?.url) {
+      isCurrentTabOnWatchlist = isUrlOnWatchlist(currentTab.url, currentSettings.blocklist);
+    }
 
     const focusState = await loadFocusState();
 
@@ -265,13 +316,14 @@ async function bootstrap() {
 
   elements.reminderFrequency?.addEventListener("input", (event) => {
     const target = event.target as HTMLInputElement;
-    const minutes = parseInt(target.value, 10);
-    updateReminderValue(minutes);
+    const seconds = parseInt(target.value, 10);
+    updateReminderValueFromSeconds(seconds);
   });
 
   elements.reminderFrequency?.addEventListener("change", (event) => {
     const target = event.target as HTMLInputElement;
-    const minutes = parseInt(target.value, 10);
+    const seconds = parseInt(target.value, 10);
+    const minutes = seconds / 60;
     void handleReminderFrequencyChange(minutes);
   });
 

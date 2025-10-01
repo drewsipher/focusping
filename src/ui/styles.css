@@ -698,6 +698,7 @@ button:hover {
   background: var(--color-surface-light);
   border-radius: var(--radius-medium);
   padding: var(--spacing-lg);
+  margin: var(--spacing-md);
   max-width: 400px;
   width: 90%;
   box-shadow: var(--shadow-elevated);

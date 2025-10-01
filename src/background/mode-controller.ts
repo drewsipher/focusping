@@ -464,6 +464,14 @@ async function handleGentleIntervention(
   const frequencyMs = frequencyMinutes * MS_PER_MINUTE;
   const elapsed = now - last;
 
+  console.debug("[Mode Controller] handleGentleIntervention", {
+    domain,
+    frequencyMinutes,
+    elapsed,
+    frequencyMs,
+    hasCurrentIntervention: !!currentIntervention,
+  });
+
   if (
     currentIntervention?.kind === "gentle" &&
     currentIntervention.domain === domain &&
@@ -471,6 +479,9 @@ async function handleGentleIntervention(
     elapsed < frequencyMs
   ) {
     const remainingMs = Math.max(0, frequencyMs - elapsed);
+    console.debug("[Mode Controller] Intervention already active, rescheduling", {
+      remainingMs,
+    });
     if (remainingMs > 0) {
       await scheduleGentleReminder(domain, now + remainingMs);
       await mutateSessionState((state) => ({
@@ -485,6 +496,7 @@ async function handleGentleIntervention(
     return;
   }
 
+  console.debug("[Mode Controller] Sending new gentle intervention");
   await sendGentleIntervention(tab.id, domain, pattern, url, frequencyMinutes);
   await scheduleGentleReminder(domain, now + frequencyMs);
   await updateSessionGentleState(domain, frequencyMinutes, now);
@@ -698,11 +710,13 @@ function registerListeners() {
 
   chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name.startsWith(GENTLE_REMINDER_PREFIX)) {
+      console.debug("[Mode Controller] Gentle reminder alarm fired:", alarm.name);
       currentIntervention = null;
       requestEvaluation("gentle-reminder");
       return;
     }
     if (alarm.name.startsWith(SNOOZE_ALARM_PREFIX)) {
+      console.debug("[Mode Controller] Snooze alarm fired:", alarm.name);
       requestEvaluation("snooze-expired");
     }
   });

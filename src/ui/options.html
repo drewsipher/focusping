@@ -30,11 +30,11 @@
         <h2>Reminder behavior</h2>
         <label>
           Reminder cadence (minutes)
-          <input id="reminder-frequency" type="number" min="1" max="60" />
+          <input id="reminder-frequency" type="number" min="0.08" max="60" step="0.01" />
         </label>
         <label>
           Snooze duration (minutes)
-          <input id="snooze-duration" type="number" min="1" max="60" />
+          <input id="snooze-duration" type="number" min="0.08" max="60" step="0.01" />
         </label>
         <label><input id="gif-toggle" type="checkbox" /> Show humorous GIFs</label>
         <div id="gif-preview" class="gif-preview" role="img" aria-live="polite">
