@@ -176,3 +176,11 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     });
   }
 });
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type === "focusping::get-focus-state") {
+    const state = getCurrentFocusState();
+    sendResponse(state);
+    return true;
+  }
+});

@@ -3,54 +3,87 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Focus Ping</title>
+    <title>FocusPing</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <main id="app" class="popup" aria-live="polite">
+    <main class="popup">
       <header class="popup__header">
-        <h1 class="popup__title">Focus Ping</h1>
-        <span id="status-badge" class="status-badge" data-status="loading">Initializing…</span>
+        <h1 class="popup__title">FocusPing</h1>
       </header>
 
-      <section class="popup__section" aria-labelledby="focus-state-heading">
-        <h2 id="focus-state-heading" class="popup__eyebrow">Current status</h2>
-        <p id="status-headline" class="popup__headline">Checking your focus…</p>
-        <p class="popup__subtext">
-          Next reminder
-          <strong id="reminder-countdown">--</strong>
-        </p>
-      </section>
-
-      <section class="popup__section popup__controls" aria-labelledby="focus-controls-heading">
-        <h2 id="focus-controls-heading" class="popup__eyebrow">Controls</h2>
-        <button id="toggle" type="button" class="popup__button">Pause monitoring</button>
-        <div class="test-controls">
-          <button id="test-gentle" type="button" class="popup__button">Test gentle toast</button>
-          <button id="test-strict" type="button" class="popup__button">Test strict overlay</button>
-        </div>
-        <div class="mode-toggle" role="radiogroup" aria-label="Intervention mode">
-          <label class="mode-toggle__option">
-            <input id="mode-gentle" type="radio" name="mode" value="gentle" />
-            <span>Gentle</span>
-          </label>
-          <label class="mode-toggle__option">
-            <input id="mode-strict" type="radio" name="mode" value="strict" />
-            <span>Strict</span>
-          </label>
+      <section class="popup__status">
+        <div id="status-indicator" class="status-indicator" data-status="loading">
+          <span class="status-indicator__icon"></span>
+          <div class="status-indicator__content">
+            <h2 id="status-title" class="status-indicator__title">Loading...</h2>
+            <p id="status-message" class="status-indicator__message"></p>
+          </div>
         </div>
       </section>
 
-      <section class="popup__section" aria-labelledby="focus-schedule-heading">
-        <h2 id="focus-schedule-heading" class="popup__eyebrow">Focus window</h2>
-        <p id="schedule-summary" class="popup__subtext">--</p>
-        <p id="next-transition" class="popup__subtext">--</p>
+      <section class="popup__controls">
+        <div class="control-group">
+          <label class="control-label">Mode</label>
+          <div class="mode-toggle" role="radiogroup" aria-label="Intervention mode">
+            <label class="mode-toggle__option">
+              <input id="mode-gentle" type="radio" name="mode" value="gentle" />
+              <span>Gentle</span>
+            </label>
+            <label class="mode-toggle__option">
+              <input id="mode-strict" type="radio" name="mode" value="strict" />
+              <span>Strict</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <label class="control-label" for="reminder-frequency">
+            Reminder frequency
+            <span id="reminder-value" class="control-value">5 min</span>
+          </label>
+          <input
+            id="reminder-frequency"
+            type="range"
+            min="1"
+            max="60"
+            step="1"
+            value="5"
+            class="slider"
+          />
+        </div>
       </section>
 
-      <footer class="popup__footer">
-        <button id="open-options" type="button" class="linkish">Open settings</button>
-      </footer>
+      <section class="popup__actions">
+        <button id="add-site" type="button" class="popup__button popup__button--secondary">
+          <span class="button-icon">+</span>
+          Add Site to Watch List
+        </button>
+        <button id="open-options" type="button" class="popup__button popup__button--primary">
+          Open Settings
+        </button>
+      </section>
     </main>
+
+    <div id="add-site-modal" class="modal" hidden>
+      <div class="modal__overlay"></div>
+      <div class="modal__content">
+        <h3 class="modal__title">Add Site to Watch List</h3>
+        <p id="modal-site-info" class="modal__message"></p>
+        <div class="modal__actions">
+          <button id="add-exact-url" type="button" class="popup__button popup__button--secondary">
+            Add Exact URL
+          </button>
+          <button id="add-base-domain" type="button" class="popup__button popup__button--primary">
+            Add Base Domain
+          </button>
+          <button id="cancel-add" type="button" class="popup__button popup__button--text">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+
     <script type="module" src="./popup.ts"></script>
   </body>
 </html>
