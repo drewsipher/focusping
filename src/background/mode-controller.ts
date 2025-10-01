@@ -510,7 +510,11 @@ function registerListeners() {
 
   listenersRegistered = true;
   chrome.tabs.onActivated.addListener((activeInfo) => {
-    if (currentIntervention && currentIntervention.kind === "strict" && currentIntervention.tabId !== activeInfo.tabId) {
+    if (
+      currentIntervention &&
+      currentIntervention.kind === "strict" &&
+      currentIntervention.tabId !== activeInfo.tabId
+    ) {
       void clearCurrentIntervention("tab-switched");
     }
     requestEvaluation("tab-activated");
@@ -538,7 +542,6 @@ function registerListeners() {
 
   chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name.startsWith(GENTLE_REMINDER_PREFIX)) {
-    
       currentIntervention = null;
       requestEvaluation("gentle-reminder");
       return;
@@ -593,6 +596,45 @@ function registerListeners() {
 
     return undefined;
   });
+
+  // When a content script comes online in a tab (for example after the extension is
+  // reloaded/installed), it will send a `focus-ping::content-ready` message. If we
+  // currently have an active intervention for that tab/domain, re-send it so the
+  // UI appears without the user needing to reload the page.
+  chrome.runtime.onMessage.addListener((message, sender) => {
+    if (!message || message.type !== "focus-ping::content-ready") {
+      return;
+    }
+
+    // Sender may be undefined when message originates from the background; only
+    // act when we have a tab id on the sender.
+    const tabId = sender && (sender.tab as chrome.tabs.Tab | undefined)?.id;
+    if (typeof tabId !== "number") {
+      return;
+    }
+
+    // If we have a current intervention for this tab, re-send it.
+    if (!currentIntervention) {
+      return;
+    }
+
+    const iv = currentIntervention;
+    if (iv.tabId !== tabId) {
+      return;
+    }
+
+    (async () => {
+      try {
+        if (iv.kind === "gentle") {
+          await sendGentleIntervention(iv.tabId, iv.domain, iv.pattern, iv.url, Math.max(1, settings?.reminder.frequencyMinutes ?? 5));
+        } else {
+          await sendStrictIntervention(iv.tabId, iv.domain, iv.pattern, iv.url);
+        }
+      } catch (error) {
+        console.error("Failed to re-send intervention on content-ready", error);
+      }
+    })();
+  });
 }
 
 async function handleDebugTrigger(
@@ -617,7 +659,7 @@ async function handleDebugTrigger(
   const pattern = null;
   const url = "https://example.com";
 
-  console.log("[Mode Controller] Sending intervention to tab", tab.id);
+  console.log("[Mode Controller] Sending debug intervention to tab", tab.id);
 
   if (requestedKind === "strict") {
     await sendStrictIntervention(tab.id, domain, pattern, url);

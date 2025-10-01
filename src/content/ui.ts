@@ -626,12 +626,19 @@ export class FocusPingUi {
 
   async showGentle(payload: GentleInterventionPayload, options: GentleOptions) {
     const container = await this.ensureContainer();
+    // Make the host visible to assistive technology while the UI is shown so
+    // focusing interactive elements (buttons) does not trigger the browser
+    // warning about focusing an element hidden via aria-hidden.
+    container.removeAttribute("aria-hidden");
     this.strict.hide();
     this.gentle.show(container, payload, options);
   }
 
   async showStrict(payload: StrictInterventionPayload, options: StrictOptions) {
     const container = await this.ensureContainer();
+    // See comment in showGentle: ensure host is not aria-hidden when showing
+    // an overlay that will focus its controls.
+    container.removeAttribute("aria-hidden");
     this.gentle.hide();
     this.strict.show(container, payload, options);
   }
@@ -639,5 +646,9 @@ export class FocusPingUi {
   clear() {
     this.gentle.hide();
     this.strict.hide();
+    // Return the host to hidden for assistive technology when no UI is present.
+    if (this.host) {
+      this.host.setAttribute("aria-hidden", "true");
+    }
   }
 }

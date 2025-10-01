@@ -43,19 +43,25 @@
   - [x] 3.4.2 Implement blocklist management UI (add/remove domains, validation).
   - [x] 3.4.3 Add GIF/visual flair toggles with real-time preview.
 
-## 4. Assets & Content
-- [ ] **4.1 Curate humorous GIF pack and static fallback images (verify licensing).**
-- [ ] **4.2 Write motivational copy variants for gentle and strict modes.**
-- [ ] **4.3 Document localization strategy decision (MVP English only vs. roadmap).**
+## 4. Cleanup and robustness
+- [ ] **4.1 Simplify code, referring to the requirements document to make sure features that are implemented are still working, but code is as simple as possible.**
+- [ ] **4.2 Rename all references of "focus-ping" to focusping**
+- [ ] **4.3 Remove debugging console outputs**
 
-## 5. Testing & Quality
-- [ ] **5.1 Configure automated tests (unit with Vitest/Jest, e2e with Puppeteer or Extension tester).**
-- [ ] **5.2 Write unit tests for scheduler, site detector, and mode controller.**
-- [ ] **5.3 Create manual QA checklist covering major distracting domains and schedule edges.**
-- [ ] **5.4 Run accessibility audit on toast and overlay (Lighthouse or axe).**
 
-## 6. Launch Preparation
-- [ ] **6.1 Package signed MV3 build (Chrome `chrome://extensions` packaging).**
-- [ ] **6.2 Draft Chrome Web Store listing copy, screenshots, and privacy statement.**
-- [ ] **6.3 Verify store policy compliance (permissions, assets licensing, data handling).**
-- [ ] **6.4 Plan post-launch telemetry placeholder activation steps.**
+## 5. Assets & Content
+- [ ] **5.1 Curate humorous GIF pack and static fallback images.**
+- [ ] **5.2 Write motivational copy variants for gentle and strict modes.**
+- [ ] **5.3 Document localization strategy decision (MVP English only vs. roadmap).**
+
+## 6. Testing & Quality
+- [ ] **6.1 Configure automated tests (unit with Vitest/Jest, e2e with Puppeteer or Extension tester).**
+- [ ] **6.2 Write unit tests for scheduler, site detector, and mode controller.**
+- [ ] **6.3 Create manual QA checklist covering major distracting domains and schedule edges.**
+- [ ] **6.4 Run accessibility audit on toast and overlay (Lighthouse or axe).**
+
+## 7. Launch Preparation
+- [ ] **7.1 Package signed MV3 build (Chrome `chrome://extensions` packaging).**
+- [ ] **7.2 Draft Chrome Web Store listing copy, screenshots, and privacy statement.**
+- [ ] **7.3 Verify store policy compliance (permissions, assets licensing, data handling).**
+- [ ] **7.4 Plan post-launch telemetry placeholder activation steps.**

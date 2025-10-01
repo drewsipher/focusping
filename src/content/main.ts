@@ -7,15 +7,16 @@ const CONTENT_NAMESPACE = "focus-ping-content";
 console.debug(`[${CONTENT_NAMESPACE}] Loaded on`, window.location.hostname);
 
 const runtime = {
-  sendMessage: (message) => new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage(message, (response) => {
-      if (chrome.runtime.lastError) {
-        reject(new Error(chrome.runtime.lastError.message));
-      } else {
-        resolve(response);
-      }
-    });
-  }),
+  sendMessage: (message) =>
+    new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage(message, (response) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else {
+          resolve(response);
+        }
+      });
+    }),
 };
 
 const p = {
@@ -119,3 +120,13 @@ chrome.runtime.onMessage.addListener((message) => {
     console.debug(`[${CONTENT_NAMESPACE}] Heartbeat received`);
   }
 });
+
+// Notify background that the content script is present in this tab. This helps when the
+// extension is (re)loaded while pages are already open — the background may have
+// already decided an intervention but the content script wasn't injected yet. Sending
+// this lets the background re-send any active intervention for this tab immediately.
+void runtime
+  .sendMessage({ type: "focus-ping::content-ready" })
+  .catch(() => {
+    /* best-effort; nothing to do on failure */
+  });
