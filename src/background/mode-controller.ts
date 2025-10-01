@@ -98,10 +98,7 @@ async function clearSnoozeExpiry(domain: string) {
 }
 
 function handleMissingListener(error: unknown) {
-  if (error instanceof Error && /Receiving end does not exist/.test(error.message)) {
-    return;
-  }
-  console.debug("No active listeners for mode controller message", error);
+  console.log("[Mode Controller] Message send failed:", error);
 }
 
 async function sendGentleIntervention(
@@ -536,6 +533,7 @@ function registerListeners() {
 
   chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name.startsWith(GENTLE_REMINDER_PREFIX)) {
+    
       currentIntervention = null;
       requestEvaluation("gentle-reminder");
       return;
@@ -549,6 +547,8 @@ function registerListeners() {
     if (!message?.type) {
       return;
     }
+
+    console.log("[Mode Controller] Received message:", message.type);
 
     if (message.type === "focus-ping::command-snooze") {
       void handleSnoozeCommand(message.payload).then(() => sendResponse({ ok: true }));
@@ -595,11 +595,15 @@ async function handleDebugTrigger(
 ): Promise<{ ok: boolean; reason?: string }> {
   const requestedKind = payload?.kind ?? "gentle";
 
+  console.log("[Mode Controller] Handling debug trigger for", requestedKind);
+
   await ensureSettingsLoaded();
   const activeSettings = settings;
 
   const tab = await tabs.getActive();
+  console.log("[Mode Controller] Active tab:", tab?.url, tab?.id);
   if (!tab || typeof tab.id !== "number") {
+    console.log("[Mode Controller] No active tab");
     return { ok: false, reason: "no-active-tab" };
   }
 
@@ -608,15 +612,14 @@ async function handleDebugTrigger(
   const pattern = null;
   const url = "https://example.com";
 
+  console.log("[Mode Controller] Sending intervention to tab", tab.id);
+
   if (requestedKind === "strict") {
     await sendStrictIntervention(tab.id, domain, pattern, url);
     return { ok: true };
   }
 
-  const frequencyMinutes = Math.max(
-    1,
-    activeSettings?.reminder.frequencyMinutes ?? 5,
-  );
+  const frequencyMinutes = Math.max(1, activeSettings?.reminder.frequencyMinutes ?? 5);
   await sendGentleIntervention(tab.id, domain, pattern, url, frequencyMinutes);
   return { ok: true };
 }

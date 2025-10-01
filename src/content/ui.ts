@@ -330,7 +330,7 @@ class GentleToast {
   private dismissButton: HTMLButtonElement | null = null;
   private snoozeButton: HTMLButtonElement | null = null;
 
-  private ensureContainer(shadow: ShadowRoot) {
+  private ensureContainer(container: HTMLElement) {
     if (this.container) {
       return;
     }
@@ -375,7 +375,7 @@ class GentleToast {
     actions.append(dismiss, snooze);
     toast.append(header, headline, message, countdown, visual, actions);
     banner.appendChild(toast);
-    shadow.appendChild(banner);
+    container.appendChild(banner);
 
     this.container = toast;
     this.countdownEl = countdown;
@@ -402,8 +402,8 @@ class GentleToast {
     this.snoozeButton = null;
   }
 
-  show(shadow: ShadowRoot, payload: GentleInterventionPayload, options: GentleOptions) {
-    this.ensureContainer(shadow);
+  show(container: HTMLElement, payload: GentleInterventionPayload, options: GentleOptions) {
+    this.ensureContainer(container);
     if (!this.container || !this.countdownEl || !this.messageEl || !this.headlineEl) {
       return;
     }
@@ -481,7 +481,7 @@ class StrictOverlay {
   private snoozeButton: HTMLButtonElement | null = null;
   private switchButton: HTMLButtonElement | null = null;
 
-  private ensureContainer(shadow: ShadowRoot) {
+  private ensureContainer(container: HTMLElement) {
     if (this.container) {
       return;
     }
@@ -527,7 +527,7 @@ class StrictOverlay {
     actions.append(snooze, switchTab);
     card.append(eyebrow, headline, message, visual, actions, note);
     overlay.appendChild(card);
-    shadow.appendChild(overlay);
+    container.appendChild(overlay);
 
     this.container = overlay;
     this.headlineEl = headline;
@@ -550,8 +550,8 @@ class StrictOverlay {
     document.documentElement.style.removeProperty("overflow");
   }
 
-  show(shadow: ShadowRoot, payload: StrictInterventionPayload, options: StrictOptions) {
-    this.ensureContainer(shadow);
+  show(container: HTMLElement, payload: StrictInterventionPayload, options: StrictOptions) {
+    this.ensureContainer(container);
     if (!this.container || !this.headlineEl || !this.messageEl || !this.noteEl) {
       return;
     }
@@ -606,14 +606,13 @@ class StrictOverlay {
 
 export class FocusPingUi {
   private host: HTMLDivElement | null = null;
-  private shadow: ShadowRoot | null = null;
-  private readyPromise: Promise<ShadowRoot> | null = null;
+  private readyPromise: Promise<HTMLDivElement> | null = null;
   private gentle = new GentleToast();
   private strict = new StrictOverlay();
 
-  private ensureShadowRoot(): Promise<ShadowRoot> {
-    if (this.shadow) {
-      return Promise.resolve(this.shadow);
+  private ensureContainer(): Promise<HTMLDivElement> {
+    if (this.host) {
+      return Promise.resolve(this.host);
     }
 
     if (!this.readyPromise) {
@@ -622,14 +621,18 @@ export class FocusPingUi {
           const host = document.createElement("div");
           host.id = "focus-ping-root";
           host.setAttribute("aria-hidden", "true");
-          const shadow = host.attachShadow({ mode: "open" });
-          const style = document.createElement("style");
-          style.textContent = UI_STYLE;
-          shadow.appendChild(style);
           document.body.appendChild(host);
+
+          // Add styles to head if not already
+          if (!document.getElementById("focus-ping-styles")) {
+            const style = document.createElement("style");
+            style.id = "focus-ping-styles";
+            style.textContent = UI_STYLE;
+            document.head.appendChild(style);
+          }
+
           this.host = host;
-          this.shadow = shadow;
-          resolve(shadow);
+          resolve(host);
         };
 
         if (document.body) {
@@ -644,15 +647,15 @@ export class FocusPingUi {
   }
 
   async showGentle(payload: GentleInterventionPayload, options: GentleOptions) {
-    const shadow = await this.ensureShadowRoot();
+    const container = await this.ensureContainer();
     this.strict.hide();
-    this.gentle.show(shadow, payload, options);
+    this.gentle.show(container, payload, options);
   }
 
   async showStrict(payload: StrictInterventionPayload, options: StrictOptions) {
-    const shadow = await this.ensureShadowRoot();
+    const container = await this.ensureContainer();
     this.gentle.hide();
-    this.strict.show(shadow, payload, options);
+    this.strict.show(container, payload, options);
   }
 
   clear() {
