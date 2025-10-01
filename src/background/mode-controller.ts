@@ -495,6 +495,24 @@ async function handleGentleIntervention(
     newTabId: tab.id,
   });
 
+  // Check if there's already an alarm scheduled for this domain
+  const alarmName = gentleAlarmName(domain);
+  const existingAlarm = await alarms.get(alarmName);
+  if (existingAlarm && typeof tab.id === "number") {
+    console.log("⏰ [SKIP] Alarm already scheduled for", domain, "at", new Date(existingAlarm.scheduledTime).toISOString());
+    // Update current intervention to track this tab
+    currentIntervention = {
+      kind: "gentle",
+      domain,
+      pattern,
+      tabId: tab.id,
+      url,
+      triggeredAt: Date.now(),
+      reminderDueAt: existingAlarm.scheduledTime,
+    };
+    return;
+  }
+
   // If we already have an intervention for this domain and tab, don't create another
   if (
     currentIntervention?.kind === "gentle" &&
@@ -721,6 +739,30 @@ async function handleDismissGentleCommand(payload: DismissCommandPayload | undef
   currentIntervention = null;
 }
 
+async function handleFrequencyChanged(payload: { frequencyMinutes: number } | undefined) {
+  console.log("🔄 [FREQUENCY] Reminder frequency changed", payload);
+  
+  if (!payload || typeof payload.frequencyMinutes !== "number") {
+    return;
+  }
+
+  // Clear all existing gentle reminder alarms
+  const allAlarms = await alarms.getAll();
+  for (const alarm of allAlarms) {
+    if (alarm.name.startsWith(GENTLE_REMINDER_PREFIX)) {
+      await alarms.clear(alarm.name);
+      console.log("🧹 [FREQUENCY] Cleared old alarm:", alarm.name);
+    }
+  }
+
+  // Clear current intervention
+  currentIntervention = null;
+
+  // Re-evaluate to apply new frequency if user is on a watched site
+  console.log("🔄 [FREQUENCY] Re-evaluating with new frequency");
+  requestEvaluation("frequency-changed");
+}
+
 function registerListeners() {
   if (listenersRegistered) {
     return;
@@ -736,8 +778,8 @@ function registerListeners() {
       void clearCurrentIntervention("tab-switched");
     }
 
-    // Cancel any pending alarms when switching tabs
-    void clearGentleReminder(null);
+    // Don't cancel pending alarms - let them fire if the user returns to the watched site
+    // The handleGentleIntervention will check if an alarm is already scheduled
 
     requestEvaluation("tab-activated");
   });
@@ -796,6 +838,11 @@ function registerListeners() {
 
     if (message.type === "focusping::command-dismiss-gentle") {
       void handleDismissGentleCommand(message.payload).then(() => sendResponse({ ok: true }));
+      return true;
+    }
+
+    if (message.type === "focusping::frequency-changed") {
+      void handleFrequencyChanged(message.payload).then(() => sendResponse({ ok: true }));
       return true;
     }
 

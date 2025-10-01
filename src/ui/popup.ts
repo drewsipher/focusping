@@ -265,6 +265,16 @@ async function handleReminderFrequencyChange(minutes: number) {
   currentSettings = updated;
   const seconds = Math.round(minutes * 60);
   updateReminderValueFromSeconds(seconds);
+
+  // Notify background to reset timers with new frequency
+  try {
+    await chrome.runtime.sendMessage({
+      type: "focusping::frequency-changed",
+      payload: { frequencyMinutes: minutes },
+    });
+  } catch (error) {
+    console.error("Failed to notify background of frequency change:", error);
+  }
 }
 
 async function loadFocusState(): Promise<FocusState | null> {
