@@ -1,7 +1,5 @@
 type StorageAreaName = "sync" | "local" | "session";
 
-type StorageGetReturn<T> = T extends string ? Record<T, unknown> : Record<string, unknown>;
-
 type Message = Parameters<typeof chrome.runtime.sendMessage>[0];
 
 type BadgeBackgroundColor = Parameters<typeof chrome.action.setBadgeBackgroundColor>[0];
@@ -52,20 +50,16 @@ function createStorageArea(areaName: StorageAreaName) {
   return {
     get<T>(key: string, fallback: T): Promise<T> {
       return createPromise<T>((resolve, reject) => {
-        console.log("chrome storage get", areaName, key, "fallback:", fallback);
         area.get(key, (result) => {
-          console.log("chrome storage get result", areaName, key, "result:", result);
           const value = result?.[key];
-          const finalValue = (value !== undefined && value !== null) ? value as T : fallback;
+          const finalValue = value !== undefined && value !== null ? (value as T) : fallback;
           withLastError(resolve, reject, finalValue);
         });
       });
     },
     set<T>(key: string, value: T): Promise<void> {
       return createPromise<void>((resolve, reject) => {
-        console.log("chrome storage set", areaName, key, "value:", value);
         area.set({ [key]: value }, () => {
-          console.log("chrome storage set completed", areaName, key);
           withLastError(resolve, reject, undefined);
         });
       });
@@ -81,14 +75,17 @@ function createStorageArea(areaName: StorageAreaName) {
       });
     },
     watch<T>(key: string, callback: (newValue: T, areaName: StorageAreaName) => void) {
-      const listener = (changes: Record<string, chrome.storage.StorageChange>, changedArea: string) => {
+      const listener = (
+        changes: Record<string, chrome.storage.StorageChange>,
+        changedArea: string,
+      ) => {
         if (changedArea === areaName && changes[key]) {
           callback(changes[key].newValue as T, areaName);
         }
       };
-      
+
       chrome.storage.onChanged.addListener(listener);
-      
+
       // Return unsubscribe function
       return () => {
         chrome.storage.onChanged.removeListener(listener);

@@ -149,14 +149,14 @@ export async function getSettings(): Promise<Settings> {
     SETTINGS_STORAGE_KEY,
     undefined,
   );
-  
+
   // Only write back if settings don't exist or need migration
   if (!stored || stored.version !== CURRENT_SETTINGS_VERSION) {
     const migrated = migrateSettings(stored);
     await chromeStorage.sync.set(SETTINGS_STORAGE_KEY, migrated);
     return migrated;
   }
-  
+
   return stored;
 }
 

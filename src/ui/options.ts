@@ -22,7 +22,6 @@ type Elements = {
   domainError: HTMLParagraphElement | null;
   gifPreview: HTMLDivElement | null;
   gifPreviewState: HTMLElement | null;
-  saveButton: HTMLButtonElement | null;
 };
 
 const query = <T extends HTMLElement>(id: string) => document.getElementById(id) as T | null;
@@ -42,7 +41,6 @@ function collectElements(): Elements {
     domainError: query<HTMLParagraphElement>("domain-error"),
     gifPreview: query<HTMLDivElement>("gif-preview"),
     gifPreviewState: query<HTMLElement>("gif-preview-state"),
-    saveButton: query<HTMLButtonElement>("save-settings"),
   };
 }
 
@@ -199,7 +197,7 @@ function readMinutes(input: HTMLInputElement | null, fallback: number): number {
 
   const value = input.value.trim();
   const parsed = Number.parseFloat(value);
-  
+
   if (!Number.isFinite(parsed) || parsed < 0) {
     // Reset to fallback on invalid input
     input.value = String(fallback);
@@ -208,43 +206,34 @@ function readMinutes(input: HTMLInputElement | null, fallback: number): number {
 
   const min = input.min ? Number.parseFloat(input.min) : 0;
   const max = input.max ? Number.parseFloat(input.max) : Number.POSITIVE_INFINITY;
-  
+
   const clamped = Math.min(Math.max(parsed, min), max);
-  
+
   // Only update input if value was clamped
   if (clamped !== parsed) {
     input.value = String(clamped);
   }
-  
+
   return clamped;
 }
 
 async function applyUpdate(updater: (settings: Settings) => Settings) {
   if (isApplying) {
-    console.warn("Update already in progress, skipping");
     return;
   }
-  
+
   try {
     isApplying = true;
-    console.log("[applyUpdate] Starting update, current settings:", currentSettings);
     const updated = updater(currentSettings!);
-    console.log("[applyUpdate] After updater, updated settings:", updated);
-    
-    // Actually save to storage
-    const saved = await setSettings(updated);
-    console.log("[applyUpdate] Settings saved to storage:", saved);
-    
-    // Update local state
+
+    await setSettings(updated);
+
     currentSettings = updated;
     renderSettings(updated);
-    
-    // Notify other components
+
     await sendStateUpdateMessage();
-    console.log("[applyUpdate] Update complete");
   } catch (error) {
-    console.error("[applyUpdate] Failed to save settings:", error);
-    // Revert UI to current settings
+    console.error("Failed to save settings:", error);
     if (currentSettings) {
       renderSettings(currentSettings);
     }
@@ -297,11 +286,9 @@ function handleSchedulePausedChange() {
 }
 
 function handleReminderFrequencyChange() {
-  console.log("handleReminderFrequencyChange called, input value:", elements.reminderFrequency?.value);
   const fallback =
     currentSettings?.reminder.frequencyMinutes ?? defaults.settings.reminder.frequencyMinutes;
   const minutes = readMinutes(elements.reminderFrequency, fallback);
-  console.log("parsed minutes:", minutes);
   void applyUpdate((settings) => ({
     ...settings,
     reminder: {
@@ -430,8 +417,6 @@ async function bootstrap() {
   elements = collectElements();
 
   const initial = await getSettings();
-  console.log("[bootstrap] Options page loaded, initial settings:", initial);
-  console.log("[bootstrap] Initial reminder frequency:", initial.reminder.frequencyMinutes);
   renderSettings(initial);
 
   elements.modeInputs.forEach((input) => {
@@ -458,27 +443,10 @@ async function bootstrap() {
   });
   elements.blocklistBody?.addEventListener("click", handleBlocklistClick);
 
-  elements.saveButton?.addEventListener("click", async () => {
-    console.log("Save button clicked, current settings:", currentSettings);
-    if (currentSettings) {
-      try {
-        const saved = await setSettings(currentSettings);
-        console.log("Settings saved:", saved);
-      } catch (error) {
-        console.error("Failed to save settings:", error);
-      }
-    }
-  });
-
   onSettingsChanged((settings) => {
-    console.log("[onSettingsChanged] Settings changed from storage:", settings);
-    console.log("[onSettingsChanged] Reminder frequency:", settings.reminder.frequencyMinutes);
     currentSettings = settings;
     if (!isApplying) {
-      console.log("[onSettingsChanged] Re-rendering with new settings");
       renderSettings(settings);
-    } else {
-      console.log("[onSettingsChanged] Skipping render, update in progress");
     }
   });
 }
