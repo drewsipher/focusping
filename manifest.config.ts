@@ -17,6 +17,8 @@ const manifest = defineManifest({
   },
   permissions: ["tabs", "storage", "notifications", "alarms"],
   host_permissions: [
+    "http://*/*",
+    "https://*/*",
     "*://*.tiktok.com/*",
     "*://*.douyin.com/*",
     "*://*.instagram.com/*",

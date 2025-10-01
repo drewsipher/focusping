@@ -130,7 +130,9 @@ button.blocklist-toggle {
   border-radius: var(--radius-large);
   background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(236, 72, 153, 0.15));
   border: 1px solid rgba(15, 23, 42, 0.12);
-  transition: opacity 180ms ease, filter 180ms ease;
+  transition:
+    opacity 180ms ease,
+    filter 180ms ease;
 }
 
 .gif-preview--off {
@@ -282,6 +284,11 @@ button.blocklist-toggle {
 .popup__controls {
   border-top: 1px solid rgba(15, 23, 42, 0.08);
   padding-top: var(--spacing-md);
+}
+
+.test-controls {
+  display: grid;
+  gap: var(--spacing-sm);
 }
 
 .popup__button {

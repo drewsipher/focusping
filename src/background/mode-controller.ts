@@ -35,7 +35,13 @@ interface DismissCommandPayload {
   domain?: string;
 }
 
+interface DebugTriggerPayload {
+  kind: InterventionKind;
+}
+
 let initialized = false;
+let initializing: Promise<InterventionState | null> | null = null;
+let listenersRegistered = false;
 let focusState: FocusState | null = null;
 let settings: Settings | null = null;
 let currentIntervention: InterventionState | null = null;
@@ -501,6 +507,11 @@ async function handleDismissGentleCommand(payload: DismissCommandPayload | undef
 }
 
 function registerListeners() {
+  if (listenersRegistered) {
+    return;
+  }
+
+  listenersRegistered = true;
   chrome.tabs.onActivated.addListener(() => requestEvaluation("tab-activated"));
 
   chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
@@ -565,38 +576,95 @@ function registerListeners() {
       return true;
     }
 
+    if (message.type === "focus-ping::debug-trigger-intervention") {
+      void handleDebugTrigger(message.payload as DebugTriggerPayload | undefined)
+        .then((result) => sendResponse(result))
+        .catch((error) => {
+          console.error("Failed to trigger debug intervention", error);
+          sendResponse({ ok: false, reason: "error" });
+        });
+      return true;
+    }
+
     return undefined;
   });
 }
 
+async function handleDebugTrigger(
+  payload: DebugTriggerPayload | undefined,
+): Promise<{ ok: boolean; reason?: string }> {
+  const requestedKind = payload?.kind ?? "gentle";
+
+  await ensureSettingsLoaded();
+  const activeSettings = settings;
+
+  const tab = await tabs.getActive();
+  if (!tab || typeof tab.id !== "number") {
+    return { ok: false, reason: "no-active-tab" };
+  }
+
+  // For testing, use dummy values to work on any tab
+  const domain = "example.com";
+  const pattern = null;
+  const url = "https://example.com";
+
+  if (requestedKind === "strict") {
+    await sendStrictIntervention(tab.id, domain, pattern, url);
+    return { ok: true };
+  }
+
+  const frequencyMinutes = Math.max(
+    1,
+    activeSettings?.reminder.frequencyMinutes ?? 5,
+  );
+  await sendGentleIntervention(tab.id, domain, pattern, url, frequencyMinutes);
+  return { ok: true };
+}
+
 export async function initializeModeController() {
+  registerListeners();
+
   if (initialized) {
     return currentIntervention;
   }
 
-  await initializeSiteDetector();
+  if (initializing) {
+    return initializing;
+  }
 
-  focusState = getCurrentFocusState();
-  settings = await getSettings();
-  subscribeToFocusState((state) => {
-    focusState = state;
-    requestEvaluation("focus-state-update");
-  });
+  initializing = (async () => {
+    await initializeSiteDetector();
 
-  subscribeToBlocklist(() => {
-    requestEvaluation("blocklist-update");
-  });
+    focusState = getCurrentFocusState();
+    settings = await getSettings();
 
-  onSettingsChanged((next) => {
-    settings = next;
-    requestEvaluation("settings-changed");
-  });
+    subscribeToFocusState((state) => {
+      focusState = state;
+      requestEvaluation("focus-state-update");
+    });
 
-  registerListeners();
-  initialized = true;
+    subscribeToBlocklist(() => {
+      requestEvaluation("blocklist-update");
+    });
 
-  requestEvaluation("init");
-  return currentIntervention;
+    onSettingsChanged((next) => {
+      settings = next;
+      requestEvaluation("settings-changed");
+    });
+
+    initialized = true;
+    requestEvaluation("init");
+    return currentIntervention;
+  })()
+    .catch((error) => {
+      // Surface initialization errors to the caller for logging.
+      throw error;
+    })
+    .finally(() => {
+      initializing = null;
+    });
+
+  return initializing;
 }
 
 export function getCurrentIntervention() {

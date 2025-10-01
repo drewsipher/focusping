@@ -2,32 +2,51 @@ import { runtime } from "@/shared/chrome";
 import {
   defaults,
   getSettings,
+  mutateSettings,
   onSettingsChanged,
-  setSettings,
   type Mode,
   type Settings,
 } from "@/shared/storage";
 
-type FormSnapshot = {
-  mode: Mode;
-  schedule: {
-    start: string;
-    end: string;
-    pausedOutsideSchedule: boolean;
-  };
-  reminder: {
-    frequencyMinutes: number;
-    snoozeMinutes: number;
-    showGifs: boolean;
-  };
+type Elements = {
+  modeInputs: HTMLInputElement[];
+  scheduleStart: HTMLInputElement | null;
+  scheduleEnd: HTMLInputElement | null;
+  schedulePaused: HTMLInputElement | null;
+  reminderFrequency: HTMLInputElement | null;
+  snoozeDuration: HTMLInputElement | null;
+  gifToggle: HTMLInputElement | null;
+  blocklistForm: HTMLFormElement | null;
+  domainInput: HTMLInputElement | null;
+  blocklistBody: HTMLTableSectionElement | null;
+  domainError: HTMLParagraphElement | null;
+  gifPreview: HTMLDivElement | null;
+  gifPreviewState: HTMLElement | null;
 };
 
-const queryInput = <ElementType extends HTMLElement>(id: string) => {
-  return document.getElementById(id) as ElementType | null;
-};
+const query = <T extends HTMLElement>(id: string) => document.getElementById(id) as T | null;
 
+function collectElements(): Elements {
+  return {
+    modeInputs: Array.from(document.querySelectorAll<HTMLInputElement>("input[name='mode']")),
+    scheduleStart: query<HTMLInputElement>("schedule-start"),
+    scheduleEnd: query<HTMLInputElement>("schedule-end"),
+    schedulePaused: query<HTMLInputElement>("schedule-paused"),
+    reminderFrequency: query<HTMLInputElement>("reminder-frequency"),
+    snoozeDuration: query<HTMLInputElement>("snooze-duration"),
+    gifToggle: query<HTMLInputElement>("gif-toggle"),
+    blocklistForm: query<HTMLFormElement>("blocklist-form"),
+    domainInput: query<HTMLInputElement>("domain-input"),
+    blocklistBody: query<HTMLTableSectionElement>("blocklist-body"),
+    domainError: query<HTMLParagraphElement>("domain-error"),
+    gifPreview: query<HTMLDivElement>("gif-preview"),
+    gifPreviewState: query<HTMLElement>("gif-preview-state"),
+  };
+}
+
+let elements: Elements;
 let currentSettings: Settings | null = null;
-let isSaving = false;
+let isApplying = false;
 
 function isMissingReceiverError(error: unknown) {
   return (
@@ -49,379 +68,366 @@ async function sendStateUpdateMessage() {
   }
 }
 
-function getFormElements() {
-  return {
-    modeInputs: Array.from(document.querySelectorAll<HTMLInputElement>("input[name='mode']")),
-    scheduleStart: queryInput<HTMLInputElement>("schedule-start"),
-    scheduleEnd: queryInput<HTMLInputElement>("schedule-end"),
-    schedulePaused: queryInput<HTMLInputElement>("schedule-paused"),
-    reminderFrequency: queryInput<HTMLInputElement>("reminder-frequency"),
-    snoozeDuration: queryInput<HTMLInputElement>("snooze-duration"),
-    gifToggle: queryInput<HTMLInputElement>("gif-toggle"),
-    blocklistForm: queryInput<HTMLFormElement>("blocklist-form"),
-    domainInput: queryInput<HTMLInputElement>("domain-input"),
-    blocklistBody: queryInput<HTMLTableSectionElement>("blocklist-body"),
-    domainError: queryInput<HTMLParagraphElement>("domain-error"),
-    gifPreview: queryInput<HTMLDivElement>("gif-preview"),
-    gifPreviewState: queryInput<HTMLElement>("gif-preview-state"),
-  };
-}
-
 function setDomainError(message: string | null) {
-  const { domainError } = getFormElements();
-  if (!domainError) {
+  if (!elements.domainError) {
     return;
   }
 
-  domainError.textContent = message ?? "";
-  domainError.hidden = !message;
+  if (message) {
+    elements.domainError.textContent = message;
+    elements.domainError.hidden = false;
+  } else {
+    elements.domainError.textContent = "";
+    elements.domainError.hidden = true;
+  }
 }
 
 function updateGifPreview(showGifs: boolean) {
-  const { gifPreview, gifPreviewState } = getFormElements();
-
-  if (gifPreview) {
-    gifPreview.classList.toggle("gif-preview--off", !showGifs);
-    gifPreview.dataset.state = showGifs ? "on" : "off";
-    gifPreview.setAttribute(
+  if (elements.gifPreview) {
+    elements.gifPreview.classList.toggle("gif-preview--off", !showGifs);
+    elements.gifPreview.dataset.state = showGifs ? "on" : "off";
+    elements.gifPreview.setAttribute(
       "aria-label",
       showGifs ? "Humorous GIF preview showing a vibrant overlay" : "Humorous GIF preview disabled",
     );
   }
 
-  if (gifPreviewState) {
-    gifPreviewState.textContent = showGifs ? "on" : "off";
+  if (elements.gifPreviewState) {
+    elements.gifPreviewState.textContent = showGifs ? "on" : "off";
   }
 }
 
-async function persistSettings(next: Settings) {
-  try {
-    isSaving = true;
-    const updated = await setSettings(next);
-    applySettingsToForm(updated);
-    await sendStateUpdateMessage();
-  } catch (error) {
-    console.error("Failed to persist settings", error);
-    if (currentSettings) {
-      applySettingsToForm(currentSettings);
-    }
-  } finally {
-    isSaving = false;
+function renderBlocklist(settings: Settings) {
+  const body = elements.blocklistBody;
+  if (!body) {
+    return;
   }
-}
 
-function renderBlocklist(settings: Settings, body: HTMLTableSectionElement) {
   body.innerHTML = "";
-  const disabledSet = new Set(settings.disabledBlocklist ?? []);
   const domains = [...settings.blocklist].sort((a, b) => a.localeCompare(b));
+  const disabled = new Set(settings.disabledBlocklist ?? []);
 
   if (domains.length === 0) {
-    const emptyRow = document.createElement("tr");
-    const emptyCell = document.createElement("td");
-    emptyCell.colSpan = 3;
-    emptyCell.className = "blocklist-empty";
-    emptyCell.textContent = "No distracting sites yet.";
-    emptyRow.appendChild(emptyCell);
-    body.appendChild(emptyRow);
+    const row = document.createElement("tr");
+    const cell = document.createElement("td");
+    cell.colSpan = 3;
+    cell.className = "blocklist-empty";
+    cell.textContent = "No distracting sites yet.";
+    row.appendChild(cell);
+    body.appendChild(row);
     return;
   }
 
   domains.forEach((domain) => {
     const row = document.createElement("tr");
-    const isDisabled = disabledSet.has(domain);
-    row.dataset.disabled = isDisabled ? "true" : "false";
-
     const domainCell = document.createElement("td");
     domainCell.className = "blocklist-domain";
     domainCell.textContent = domain;
 
-    const actionCell = document.createElement("td");
-    actionCell.className = "blocklist-actions actions";
+    const statusCell = document.createElement("td");
+    statusCell.className = "blocklist-actions actions";
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "blocklist-toggle";
+    toggle.dataset.action = "toggle";
+    toggle.dataset.domain = domain;
+    const isDisabled = disabled.has(domain);
+    toggle.dataset.state = isDisabled ? "disabled" : "enabled";
+    toggle.textContent = isDisabled ? "Enable" : "Disable";
+    statusCell.appendChild(toggle);
 
-    const toggleButton = document.createElement("button");
-    toggleButton.type = "button";
-    toggleButton.className = "blocklist-toggle";
-    toggleButton.dataset.state = isDisabled ? "disabled" : "enabled";
-    toggleButton.textContent = isDisabled ? "Enable" : "Disable";
-    toggleButton.addEventListener("click", () => {
-      toggleButton.disabled = true;
-      handleToggleBlocklist(domain)
-        .catch((error) => console.error("Failed to toggle blocklist domain", error))
-        .finally(() => {
-          toggleButton.disabled = false;
-        });
-    });
-
-    actionCell.appendChild(toggleButton);
     const removeCell = document.createElement("td");
     removeCell.className = "actions";
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "blocklist-remove";
+    remove.dataset.action = "remove";
+    remove.dataset.domain = domain;
+    remove.textContent = "Remove";
+    removeCell.appendChild(remove);
 
-    const removeButton = document.createElement("button");
-    removeButton.type = "button";
-    removeButton.className = "blocklist-remove";
-    removeButton.textContent = "Remove";
-    removeButton.addEventListener("click", () => {
-      removeButton.disabled = true;
-      handleRemoveFromBlocklist(domain)
-        .catch((error) => console.error("Failed to remove blocklist domain", error))
-        .finally(() => {
-          removeButton.disabled = false;
-        });
-    });
-
-    removeCell.appendChild(removeButton);
+    row.dataset.disabled = isDisabled ? "true" : "false";
     row.appendChild(domainCell);
-    row.appendChild(actionCell);
+    row.appendChild(statusCell);
     row.appendChild(removeCell);
     body.appendChild(row);
   });
 }
 
-function applySettingsToForm(settings: Settings) {
+function renderSettings(settings: Settings) {
   currentSettings = settings;
-  const {
-    modeInputs,
-    scheduleStart,
-    scheduleEnd,
-    schedulePaused,
-    reminderFrequency,
-    snoozeDuration,
-    gifToggle,
-    blocklistBody,
-  } = getFormElements();
 
-  modeInputs.forEach((input) => {
+  elements.modeInputs.forEach((input) => {
     input.checked = input.value === settings.mode;
   });
 
-  if (scheduleStart) scheduleStart.value = settings.schedule.start;
-  if (scheduleEnd) scheduleEnd.value = settings.schedule.end;
-  if (schedulePaused) schedulePaused.checked = Boolean(settings.schedule.pausedOutsideSchedule);
-
-  if (reminderFrequency) reminderFrequency.value = String(settings.reminder.frequencyMinutes);
-  if (snoozeDuration) snoozeDuration.value = String(settings.reminder.snoozeMinutes);
-  if (gifToggle) gifToggle.checked = Boolean(settings.reminder.showGifs);
-
-  updateGifPreview(Boolean(settings.reminder.showGifs));
-
-  if (blocklistBody) {
-    renderBlocklist(settings, blocklistBody);
+  if (elements.scheduleStart) {
+    elements.scheduleStart.value = settings.schedule.start;
   }
 
+  if (elements.scheduleEnd) {
+    elements.scheduleEnd.value = settings.schedule.end;
+  }
+
+  if (elements.schedulePaused) {
+    elements.schedulePaused.checked = Boolean(settings.schedule.pausedOutsideSchedule);
+  }
+
+  if (elements.reminderFrequency) {
+    elements.reminderFrequency.value = String(settings.reminder.frequencyMinutes);
+  }
+
+  if (elements.snoozeDuration) {
+    elements.snoozeDuration.value = String(settings.reminder.snoozeMinutes);
+  }
+
+  if (elements.gifToggle) {
+    elements.gifToggle.checked = Boolean(settings.reminder.showGifs);
+  }
+
+  updateGifPreview(Boolean(settings.reminder.showGifs));
+  renderBlocklist(settings);
   setDomainError(null);
 }
 
-function readSettingsFromForm(): FormSnapshot {
-  const {
-    modeInputs,
-    scheduleStart,
-    scheduleEnd,
-    schedulePaused,
-    reminderFrequency,
-    snoozeDuration,
-    gifToggle,
-  } = getFormElements();
+function readMinutes(input: HTMLInputElement | null, fallback: number) {
+  if (!input) {
+    return fallback;
+  }
 
-  const mode = (modeInputs.find((input) => input.checked)?.value as Mode | undefined) ?? "gentle";
+  const trimmed = input.value.trim();
+  let parsed = Number.isNaN(input.valueAsNumber) ? Number.NaN : input.valueAsNumber;
 
-  const safeNumber = (input: HTMLInputElement | null, fallback: number) => {
-    if (!input) {
-      return fallback;
+  if (Number.isNaN(parsed)) {
+    parsed = trimmed ? Number.parseFloat(trimmed) : Number.NaN;
+  }
+
+  if (!Number.isFinite(parsed)) {
+    parsed = fallback;
+  }
+
+  const min = input.min ? Number.parseFloat(input.min) : Number.NEGATIVE_INFINITY;
+  const max = input.max ? Number.parseFloat(input.max) : Number.POSITIVE_INFINITY;
+
+  const clamped = Math.min(Math.max(parsed, min), max);
+  input.value = String(clamped);
+  return clamped;
+}
+
+async function applyUpdate(updater: (settings: Settings) => Settings) {
+  try {
+    isApplying = true;
+    const updated = await mutateSettings(updater);
+    renderSettings(updated);
+    await sendStateUpdateMessage();
+  } catch (error) {
+    console.error("Failed to update settings", error);
+    if (currentSettings) {
+      renderSettings(currentSettings);
     }
+  } finally {
+    isApplying = false;
+  }
+}
 
-    const trimmed = input.value.trim();
-    const candidate = Number.isNaN(input.valueAsNumber) ? undefined : input.valueAsNumber;
-    const parsed = candidate ?? (trimmed ? Number.parseFloat(trimmed) : undefined);
+function handleModeChange(event: Event) {
+  const input = event.target as HTMLInputElement | null;
+  if (!input || !input.checked) {
+    return;
+  }
 
-    if (typeof parsed !== "number" || Number.isNaN(parsed)) {
-      return fallback;
-    }
+  const nextMode = input.value as Mode;
+  void applyUpdate((settings) => ({ ...settings, mode: nextMode }));
+}
 
-    const min = input.min !== "" ? Number.parseFloat(input.min) : undefined;
-    const max = input.max !== "" ? Number.parseFloat(input.max) : undefined;
+function handleScheduleStartChange() {
+  const value = elements.scheduleStart?.value || defaults.settings.schedule.start;
+  void applyUpdate((settings) => ({
+    ...settings,
+    schedule: {
+      ...settings.schedule,
+      start: value,
+    },
+  }));
+}
 
-    let clamped = parsed;
-    if (typeof min === "number" && Number.isFinite(min)) {
-      clamped = Math.max(clamped, min);
-    }
-    if (typeof max === "number" && Number.isFinite(max)) {
-      clamped = Math.min(clamped, max);
-    }
+function handleScheduleEndChange() {
+  const value = elements.scheduleEnd?.value || defaults.settings.schedule.end;
+  void applyUpdate((settings) => ({
+    ...settings,
+    schedule: {
+      ...settings.schedule,
+      end: value,
+    },
+  }));
+}
 
-    return clamped;
-  };
+function handleSchedulePausedChange() {
+  const paused = Boolean(elements.schedulePaused?.checked);
+  void applyUpdate((settings) => ({
+    ...settings,
+    schedule: {
+      ...settings.schedule,
+      pausedOutsideSchedule: paused,
+    },
+  }));
+}
 
-  const baselineReminder =
+function handleReminderFrequencyChange() {
+  const fallback =
     currentSettings?.reminder.frequencyMinutes ?? defaults.settings.reminder.frequencyMinutes;
-  const baselineSnooze =
+  const minutes = readMinutes(elements.reminderFrequency, fallback);
+  void applyUpdate((settings) => ({
+    ...settings,
+    reminder: {
+      ...settings.reminder,
+      frequencyMinutes: minutes,
+    },
+  }));
+}
+
+function handleSnoozeDurationChange() {
+  const fallback =
     currentSettings?.reminder.snoozeMinutes ?? defaults.settings.reminder.snoozeMinutes;
-
-  return {
-    mode,
-    schedule: {
-      start: scheduleStart?.value || defaults.settings.schedule.start,
-      end: scheduleEnd?.value || defaults.settings.schedule.end,
-      pausedOutsideSchedule: Boolean(schedulePaused?.checked),
-    },
+  const minutes = readMinutes(elements.snoozeDuration, fallback);
+  void applyUpdate((settings) => ({
+    ...settings,
     reminder: {
-      frequencyMinutes: safeNumber(reminderFrequency, baselineReminder),
-      snoozeMinutes: safeNumber(snoozeDuration, baselineSnooze),
-      showGifs: Boolean(gifToggle?.checked),
+      ...settings.reminder,
+      snoozeMinutes: minutes,
     },
-  };
+  }));
 }
 
-async function persistFormSnapshot() {
-  if (!currentSettings) {
-    return;
-  }
-
-  const snapshot = readSettingsFromForm();
-  const next: Settings = {
-    ...currentSettings,
-    mode: snapshot.mode,
-    schedule: {
-      ...currentSettings.schedule,
-      ...snapshot.schedule,
-    },
+function handleGifToggleChange() {
+  const showGifs = Boolean(elements.gifToggle?.checked);
+  updateGifPreview(showGifs);
+  void applyUpdate((settings) => ({
+    ...settings,
     reminder: {
-      ...currentSettings.reminder,
-      ...snapshot.reminder,
+      ...settings.reminder,
+      showGifs,
     },
-  };
-
-  updateGifPreview(snapshot.reminder.showGifs);
-  await persistSettings(next);
-}
-
-async function handleToggleBlocklist(domain: string) {
-  if (!currentSettings) {
-    return;
-  }
-
-  const disabled = new Set(currentSettings.disabledBlocklist ?? []);
-  if (disabled.has(domain)) {
-    disabled.delete(domain);
-  } else {
-    disabled.add(domain);
-  }
-
-  const next: Settings = {
-    ...currentSettings,
-    disabledBlocklist: Array.from(disabled),
-  };
-
-  await persistSettings(next);
-}
-
-async function handleRemoveFromBlocklist(domain: string) {
-  if (!currentSettings) {
-    return;
-  }
-
-  const next: Settings = {
-    ...currentSettings,
-    blocklist: currentSettings.blocklist.filter((entry) => entry !== domain),
-    disabledBlocklist: currentSettings.disabledBlocklist.filter((entry) => entry !== domain),
-  };
-
-  await persistSettings(next);
+  }));
 }
 
 async function handleBlocklistSubmit(event: SubmitEvent) {
   event.preventDefault();
-  const { domainInput } = getFormElements();
-  if (!currentSettings || !domainInput) {
+
+  const input = elements.domainInput;
+  if (!input) {
     return;
   }
 
-  setDomainError(null);
-  const raw = domainInput.value.trim();
+  const raw = input.value.trim();
   if (!raw) {
     setDomainError("Enter a domain to add.");
-    domainInput.focus();
+    input.focus();
     return;
   }
 
+  let hostname: string | null = null;
   try {
     const parsed = new URL(raw.includes("://") ? raw : `https://${raw}`);
-    const hostname = parsed.hostname.replace(/^www\./, "").toLowerCase();
-
-    if (!hostname) {
-      setDomainError("Please enter a valid domain.");
-      domainInput.focus();
-      return;
-    }
-
-    if (currentSettings.blocklist.includes(hostname)) {
-      setDomainError("That domain is already on your list.");
-      domainInput.focus();
-      return;
-    }
-
-    const next: Settings = {
-      ...currentSettings,
-      blocklist: [...currentSettings.blocklist, hostname],
-      disabledBlocklist: currentSettings.disabledBlocklist.filter((domain) => domain !== hostname),
-    };
-
-    await persistSettings(next);
-    domainInput.value = "";
-    setDomainError(null);
-  } catch (error) {
-    console.error("Invalid URL", error);
-    setDomainError("Please enter a valid domain.");
-    domainInput.focus();
-    domainInput.select();
+    hostname = parsed.hostname.replace(/^www\./, "").toLowerCase();
+  } catch {
+    // fall through
   }
+
+  if (!hostname) {
+    setDomainError("Please enter a valid domain.");
+    input.focus();
+    input.select();
+    return;
+  }
+
+  if (currentSettings?.blocklist.includes(hostname)) {
+    setDomainError("That domain is already on your list.");
+    input.focus();
+    input.select();
+    return;
+  }
+
+  await applyUpdate((settings) => ({
+    ...settings,
+    blocklist: [...settings.blocklist, hostname],
+    disabledBlocklist: settings.disabledBlocklist.filter((domain) => domain !== hostname),
+  }));
+
+  input.value = "";
+  setDomainError(null);
 }
 
-function registerEventHandlers() {
-  const elements = getFormElements();
-  elements.modeInputs.forEach((input) =>
-    input.addEventListener("change", () => {
-      persistFormSnapshot().catch(console.error);
-    }),
-  );
-  elements.scheduleStart?.addEventListener("change", () => {
-    persistFormSnapshot().catch(console.error);
-  });
-  elements.scheduleEnd?.addEventListener("change", () => {
-    persistFormSnapshot().catch(console.error);
-  });
-  elements.schedulePaused?.addEventListener("change", () => {
-    persistFormSnapshot().catch(console.error);
-  });
-  elements.reminderFrequency?.addEventListener("change", () => {
-    persistFormSnapshot().catch(console.error);
-  });
-  elements.snoozeDuration?.addEventListener("change", () => {
-    persistFormSnapshot().catch(console.error);
-  });
-  elements.gifToggle?.addEventListener("change", () => {
-    updateGifPreview(Boolean(elements.gifToggle?.checked));
-    persistFormSnapshot().catch(console.error);
-  });
-  elements.domainInput?.addEventListener("input", () => {
-    setDomainError(null);
-  });
-  elements.blocklistForm?.addEventListener("submit", (event) => {
-    handleBlocklistSubmit(event).catch(console.error);
-  });
+function handleBlocklistClick(event: MouseEvent) {
+  const target = (event.target as HTMLElement | null)?.closest("button");
+  if (!target) {
+    return;
+  }
+
+  const action = target.dataset.action as "toggle" | "remove" | undefined;
+  const domain = target.dataset.domain;
+
+  if (!action || !domain) {
+    return;
+  }
+
+  target.disabled = true;
+
+  const finalize = () => {
+    target.disabled = false;
+  };
+
+  if (action === "toggle") {
+    void applyUpdate((settings) => {
+      const nextDisabled = new Set(settings.disabledBlocklist ?? []);
+      if (nextDisabled.has(domain)) {
+        nextDisabled.delete(domain);
+      } else {
+        nextDisabled.add(domain);
+      }
+
+      return {
+        ...settings,
+        disabledBlocklist: Array.from(nextDisabled),
+      };
+    }).finally(finalize);
+    return;
+  }
+
+  void applyUpdate((settings) => ({
+    ...settings,
+    blocklist: settings.blocklist.filter((entry) => entry !== domain),
+    disabledBlocklist: settings.disabledBlocklist.filter((entry) => entry !== domain),
+  })).finally(finalize);
 }
 
 async function bootstrap() {
-  const initial = await getSettings();
-  applySettingsToForm(initial);
+  elements = collectElements();
 
-  registerEventHandlers();
+  const initial = await getSettings();
+  renderSettings(initial);
+
+  elements.modeInputs.forEach((input) => {
+    input.addEventListener("change", handleModeChange);
+  });
+
+  elements.scheduleStart?.addEventListener("change", handleScheduleStartChange);
+  elements.scheduleEnd?.addEventListener("change", handleScheduleEndChange);
+  elements.schedulePaused?.addEventListener("change", handleSchedulePausedChange);
+  elements.reminderFrequency?.addEventListener("change", handleReminderFrequencyChange);
+  elements.snoozeDuration?.addEventListener("change", handleSnoozeDurationChange);
+  elements.gifToggle?.addEventListener("change", handleGifToggleChange);
+  elements.domainInput?.addEventListener("input", () => setDomainError(null));
+  elements.blocklistForm?.addEventListener("submit", (event) => {
+    handleBlocklistSubmit(event).catch(console.error);
+  });
+  elements.blocklistBody?.addEventListener("click", handleBlocklistClick);
 
   onSettingsChanged((settings) => {
-    if (isSaving) {
-      currentSettings = settings;
-      return;
+    currentSettings = settings;
+    if (!isApplying) {
+      renderSettings(settings);
     }
-    applySettingsToForm(settings);
   });
 }
 

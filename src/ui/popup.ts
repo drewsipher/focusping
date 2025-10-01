@@ -18,6 +18,8 @@ const reminderLabel = document.getElementById("reminder-countdown") as HTMLEleme
 const scheduleSummary = document.getElementById("schedule-summary") as HTMLElement | null;
 const nextTransitionLabel = document.getElementById("next-transition") as HTMLElement | null;
 const openOptionsButton = document.getElementById("open-options") as HTMLButtonElement | null;
+const testGentleButton = document.getElementById("test-gentle") as HTMLButtonElement | null;
+const testStrictButton = document.getElementById("test-strict") as HTMLButtonElement | null;
 const modeInputs = Array.from(document.querySelectorAll<HTMLInputElement>("input[name='mode']"));
 
 type DisplayStatus = FocusStatus | "loading";
@@ -203,6 +205,50 @@ async function requestFocusState() {
   }
 }
 
+async function triggerTestIntervention(kind: "gentle" | "strict") {
+  try {
+    const response = (await runtime.sendMessage({
+      type: "focus-ping::debug-trigger-intervention",
+      payload: { kind },
+    })) as { ok?: boolean; reason?: string } | undefined;
+
+    if (!response?.ok) {
+      console.warn("Test intervention failed", response?.reason);
+      if (reminderLabel) {
+        const reason = response?.reason ?? "unknown";
+        const message = formatInterventionFailure(kind, reason);
+        reminderLabel.textContent = message;
+        window.setTimeout(() => updateReminder(), 3000);
+      }
+      return;
+    }
+
+    if (reminderLabel) {
+      reminderLabel.textContent = kind === "gentle" ? "Gentle test sent" : "Strict test sent";
+      window.setTimeout(() => updateReminder(), 3000);
+    }
+  } catch (error) {
+    console.error("Failed to trigger test intervention", error);
+    if (reminderLabel) {
+      reminderLabel.textContent = "Test error";
+      window.setTimeout(() => updateReminder(), 3000);
+    }
+  }
+}
+
+function formatInterventionFailure(kind: "gentle" | "strict", reason: string) {
+  switch (reason) {
+    case "no-active-tab":
+      return "Open a tab to try the test again.";
+    case "unsupported-url":
+      return "Switch to a regular website tab before testing.";
+    case "invalid-url":
+      return "This page has no domain; try another site.";
+    default:
+      return kind === "gentle" ? "Gentle test failed" : "Strict test failed";
+  }
+}
+
 toggleButton?.addEventListener("click", () => {
   togglePause().catch(console.error);
 });
@@ -217,6 +263,14 @@ modeInputs.forEach((input) => {
 
 openOptionsButton?.addEventListener("click", () => {
   runtime.openOptionsPage().catch(console.error);
+});
+
+testGentleButton?.addEventListener("click", () => {
+  triggerTestIntervention("gentle").catch(console.error);
+});
+
+testStrictButton?.addEventListener("click", () => {
+  triggerTestIntervention("strict").catch(console.error);
 });
 
 chrome.runtime.onMessage.addListener((message) => {

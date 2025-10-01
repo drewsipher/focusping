@@ -90,10 +90,24 @@ function createTabHelpers() {
         chrome.tabs.query(queryInfo, (tabs) => withLastError(resolve, reject, tabs));
       });
     },
-    getActive(windowId?: number): Promise<chrome.tabs.Tab | undefined> {
-      return this.query({ active: true, currentWindow: windowId === undefined, windowId }).then(
-        (tabs) => tabs[0],
-      );
+    async getActive(windowId?: number): Promise<chrome.tabs.Tab | undefined> {
+      if (typeof windowId === "number") {
+        const [tab] = await this.query({ active: true, windowId });
+        return tab;
+      }
+
+      let [tab] = await this.query({ active: true, lastFocusedWindow: true });
+      if (tab) {
+        return tab;
+      }
+
+      [tab] = await this.query({ active: true, currentWindow: true });
+      if (tab) {
+        return tab;
+      }
+
+      [tab] = await this.query({ active: true });
+      return tab;
     },
     sendMessage<T = unknown, R = unknown>(tabId: number, message: T): Promise<R | undefined> {
       return createPromise((resolve, reject) => {
