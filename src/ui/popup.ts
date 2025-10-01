@@ -6,6 +6,7 @@ import { runtime } from "@/shared/chrome";
 
 const testGentle = document.getElementById("test-gentle");
 const testStrict = document.getElementById("test-strict");
+const openOptions = document.getElementById("open-options");
 
 testGentle?.addEventListener("click", async () => {
   try {
@@ -27,6 +28,10 @@ testStrict?.addEventListener("click", async () => {
   } catch (err) {
     console.error("popup: debug-trigger send failed", err);
   }
+});
+
+openOptions?.addEventListener("click", () => {
+  chrome.runtime.openOptionsPage();
 });
 
 // Also log when popup opens (DOMContentLoaded)
