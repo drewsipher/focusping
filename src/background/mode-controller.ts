@@ -797,11 +797,11 @@ async function handleDebugTrigger(
   if (requestedKind === "strict") {
     await sendStrictIntervention(tab.id, domain, pattern, url);
     return { ok: true };
+  } else {
+    const frequencyMinutes = Math.max(1, activeSettings?.reminder.frequencyMinutes ?? 5);
+    await sendGentleIntervention(tab.id, domain, pattern, url, frequencyMinutes);
+    return { ok: true };
   }
-
-  const frequencyMinutes = Math.max(1, activeSettings?.reminder.frequencyMinutes ?? 5);
-  await sendGentleIntervention(tab.id, domain, pattern, url, frequencyMinutes);
-  return { ok: true };
 }
 
 export async function initializeModeController() {

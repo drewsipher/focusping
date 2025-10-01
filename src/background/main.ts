@@ -1,4 +1,4 @@
-import { action, runtime } from "@/shared/chrome";
+import { action, runtime, tabs } from "@/shared/chrome";
 import {
   getCurrentFocusState,
   initializeScheduler,
@@ -96,6 +96,8 @@ subscribeToFocusState(handleFocusState);
 chrome.runtime.onInstalled.addListener(() => {
   console.info(`${EXTENSION_NAME} installed`);
   chrome.alarms.create(HEARTBEAT_ALARM, { periodInMinutes: 1 });
+  // Attempt to inject content scripts into existing tabs on install.
+  void injectContentIntoOpenTabs();
 });
 
 chrome.runtime.onStartup.addListener(() => {
@@ -104,7 +106,54 @@ chrome.runtime.onStartup.addListener(() => {
   if (state) {
     handleFocusState(state);
   }
+  // Attempt to inject content scripts into existing tabs on startup.
+  void injectContentIntoOpenTabs();
 });
+
+// Proactively inject the content script into all existing tabs where we have
+// host permission. This helps avoid the common race on fresh install where
+// content scripts aren't present in already-open tabs.
+async function injectContentIntoOpenTabs() {
+  try {
+    const allTabs = await tabs.query({});
+    for (const t of allTabs) {
+      const tabId = t.id;
+      if (typeof tabId !== "number") continue;
+
+      const url = t.url ?? t.pendingUrl;
+      if (!url || !/^https?:/i.test(url)) continue;
+
+      let origin: string;
+      try {
+        origin = new URL(url).origin;
+      } catch {
+        continue;
+      }
+
+      const hasHostPerm = await new Promise<boolean>((resolve) => {
+        try {
+          (chrome as any).permissions.contains({ origins: [origin + "/*"] }, (granted: boolean) =>
+            resolve(Boolean(granted)),
+          );
+        } catch (e) {
+          resolve(false);
+        }
+      });
+
+      if (!hasHostPerm) continue;
+
+      try {
+        if ((chrome as any).scripting && typeof (chrome as any).scripting.executeScript === "function") {
+          await (chrome as any).scripting.executeScript({ target: { tabId }, files: ["content.js"] });
+        }
+      } catch (err) {
+        console.debug("Failed to inject content script into tab", tabId, err instanceof Error ? err.message : err);
+      }
+    }
+  } catch (err) {
+    console.debug("Failed to enumerate tabs for injection", err instanceof Error ? err.message : err);
+  }
+}
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === HEARTBEAT_ALARM) {
