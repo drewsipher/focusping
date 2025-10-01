@@ -101,6 +101,39 @@ function handleMissingListener(error: unknown) {
   console.log("[Mode Controller] Message send failed:", error);
 }
 
+// Try to inject the content script into a tab and return a promise that
+// resolves once injection is attempted. This is a best-effort recovery when
+// `tabs.sendMessage` fails with "Receiving end does not exist" because the
+// content script isn't present in the tab (for example after extension install).
+async function injectContentScriptToTab(tabId: number) {
+  try {
+    const scripting = (chrome as any).scripting;
+    if (!scripting || typeof scripting.executeScript !== "function") {
+      console.warn(
+        "[Mode Controller] chrome.scripting.executeScript is not available in this environment.\n" +
+          "Ensure you are running a Chrome/Chromium version that supports the 'scripting' API with MV3, and that the manifest includes the 'scripting' permission.\n" +
+          "Falling back to asking the user to reload the page to load the content script.",
+      );
+      return false;
+    }
+
+    console.debug("[Mode Controller] Injecting content script into tab", tabId);
+    // The built content script is `content.js` in the extension root (dist).
+    // Use the scripting API to execute the script in the target tab.
+    await scripting.executeScript({
+      target: { tabId },
+      files: ["content.js"],
+    });
+    // Give the content script a short moment to initialize.
+    await new Promise((r) => setTimeout(r, 150));
+    console.debug("[Mode Controller] Injection attempted for tab", tabId);
+    return true;
+  } catch (err) {
+    console.warn("[Mode Controller] Content script injection failed", err);
+    return false;
+  }
+}
+
 async function sendGentleIntervention(
   tabId: number,
   domain: string,
@@ -117,19 +150,43 @@ async function sendGentleIntervention(
   };
 
   try {
+    console.debug("[Mode Controller] Sending gentle intervention to tab", tabId, payload);
     await tabs.sendMessage(tabId, {
       type: "focus-ping::gentle-intervention",
       payload,
     });
+    console.debug("[Mode Controller] tabs.sendMessage succeeded for gentle", tabId);
   } catch (error) {
-    handleMissingListener(error);
+    // If the receiving end does not exist, try injecting the content script once
+    // and retry the message.
+    const needInjection = error instanceof Error && /Receiving end does not exist/.test(error.message);
+    if (needInjection) {
+      console.debug("[Mode Controller] tabs.sendMessage failed; attempting injection and retry", tabId);
+      await injectContentScriptToTab(tabId);
+      try {
+        await tabs.sendMessage(tabId, {
+          type: "focus-ping::gentle-intervention",
+          payload,
+        });
+        console.debug("[Mode Controller] tabs.sendMessage retry succeeded for gentle", tabId);
+      } catch (err2) {
+        handleMissingListener(err2);
+      }
+    } else {
+      handleMissingListener(error);
+    }
   }
 
   try {
+    console.debug("[Mode Controller] Sending gentle intervention via runtime to listeners", {
+      tabId,
+      payload: { ...payload, tabId },
+    });
     await runtime.sendMessage({
       type: "focus-ping::gentle-intervention",
       payload: { ...payload, tabId },
     });
+    console.debug("[Mode Controller] runtime.sendMessage succeeded for gentle", tabId);
   } catch (error) {
     handleMissingListener(error);
   }
@@ -149,19 +206,41 @@ async function sendStrictIntervention(
   };
 
   try {
+    console.debug("[Mode Controller] Sending strict intervention to tab", tabId, payload);
     await tabs.sendMessage(tabId, {
       type: "focus-ping::strict-intervention",
       payload,
     });
+    console.debug("[Mode Controller] tabs.sendMessage succeeded for strict", tabId);
   } catch (error) {
-    handleMissingListener(error);
+    const needInjection = error instanceof Error && /Receiving end does not exist/.test(error.message);
+    if (needInjection) {
+      console.debug("[Mode Controller] tabs.sendMessage failed; attempting injection and retry", tabId);
+      await injectContentScriptToTab(tabId);
+      try {
+        await tabs.sendMessage(tabId, {
+          type: "focus-ping::strict-intervention",
+          payload,
+        });
+        console.debug("[Mode Controller] tabs.sendMessage retry succeeded for strict", tabId);
+      } catch (err2) {
+        handleMissingListener(err2);
+      }
+    } else {
+      handleMissingListener(error);
+    }
   }
 
   try {
+    console.debug("[Mode Controller] Sending strict intervention via runtime to listeners", {
+      tabId,
+      payload: { ...payload, tabId },
+    });
     await runtime.sendMessage({
       type: "focus-ping::strict-intervention",
       payload: { ...payload, tabId },
     });
+    console.debug("[Mode Controller] runtime.sendMessage succeeded for strict", tabId);
   } catch (error) {
     handleMissingListener(error);
   }
@@ -169,19 +248,41 @@ async function sendStrictIntervention(
 
 async function sendClearIntervention(tabId: number, reason: string) {
   try {
+    console.debug("[Mode Controller] Sending clear intervention to tab", tabId, reason);
     await tabs.sendMessage(tabId, {
       type: "focus-ping::clear-intervention",
       payload: { reason },
     });
+    console.debug("[Mode Controller] tabs.sendMessage succeeded for clear", tabId);
   } catch (error) {
-    handleMissingListener(error);
+    const needInjection = error instanceof Error && /Receiving end does not exist/.test(error.message);
+    if (needInjection) {
+      console.debug("[Mode Controller] tabs.sendMessage failed; attempting injection and retry", tabId);
+      await injectContentScriptToTab(tabId);
+      try {
+        await tabs.sendMessage(tabId, {
+          type: "focus-ping::clear-intervention",
+          payload: { reason },
+        });
+        console.debug("[Mode Controller] tabs.sendMessage retry succeeded for clear", tabId);
+      } catch (err2) {
+        handleMissingListener(err2);
+      }
+    } else {
+      handleMissingListener(error);
+    }
   }
 
   try {
+    console.debug("[Mode Controller] Sending clear intervention via runtime to listeners", {
+      tabId,
+      reason,
+    });
     await runtime.sendMessage({
       type: "focus-ping::clear-intervention",
       payload: { reason, tabId },
     });
+    console.debug("[Mode Controller] runtime.sendMessage succeeded for clear", tabId);
   } catch (error) {
     handleMissingListener(error);
   }
@@ -608,13 +709,16 @@ function registerListeners() {
 
     // Sender may be undefined when message originates from the background; only
     // act when we have a tab id on the sender.
+    console.debug("[Mode Controller] Received content-ready from sender", sender?.tab?.id);
     const tabId = sender && (sender.tab as chrome.tabs.Tab | undefined)?.id;
     if (typeof tabId !== "number") {
+      console.warn("[Mode Controller] content-ready had no tab id, ignoring", sender);
       return;
     }
 
     // If we have a current intervention for this tab, re-send it.
     if (!currentIntervention) {
+      console.debug("[Mode Controller] No current intervention to re-send for tab", tabId);
       return;
     }
 

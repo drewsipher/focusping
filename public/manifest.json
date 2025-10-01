@@ -12,7 +12,7 @@
     "service_worker": "background.js",
     "type": "module"
   },
-  "permissions": ["tabs", "storage", "notifications", "alarms"],
+  "permissions": ["tabs", "storage", "notifications", "alarms", "scripting"],
   "host_permissions": [
     "*://*.tiktok.com/*",
     "*://*.douyin.com/*",

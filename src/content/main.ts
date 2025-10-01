@@ -127,6 +127,9 @@ chrome.runtime.onMessage.addListener((message) => {
 // this lets the background re-send any active intervention for this tab immediately.
 void runtime
   .sendMessage({ type: "focus-ping::content-ready" })
-  .catch(() => {
-    /* best-effort; nothing to do on failure */
+  .then((response) => {
+    console.debug(`[${CONTENT_NAMESPACE}] content-ready acknowledged by background`, response);
+  })
+  .catch((error) => {
+    console.warn(`[${CONTENT_NAMESPACE}] content-ready send failed`, error);
   });
