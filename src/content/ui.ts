@@ -24,7 +24,7 @@ interface StrictOptions {
   snoozeMinutes: number;
   showGif: boolean;
   onSnooze: () => Promise<void>;
-  onOpenNewTab: () => Promise<void>;
+  onOpenNewTab?: () => Promise<void>;
 }
 
 const UI_STYLE = /* css */ `
@@ -479,7 +479,6 @@ class StrictOverlay {
   private emojiEl: HTMLDivElement | null = null;
   private noteEl: HTMLParagraphElement | null = null;
   private snoozeButton: HTMLButtonElement | null = null;
-  private switchButton: HTMLButtonElement | null = null;
 
   private ensureContainer(container: HTMLElement) {
     if (this.container) {
@@ -516,15 +515,10 @@ class StrictOverlay {
     snooze.className = "fp-button fp-button--primary";
     snooze.type = "button";
 
-    const switchTab = document.createElement("button");
-    switchTab.className = "fp-button fp-button--ghost";
-    switchTab.type = "button";
-    switchTab.textContent = "Open new tab";
-
     const note = document.createElement("p");
     note.className = "fp-note";
 
-    actions.append(snooze, switchTab);
+    actions.append(snooze);
     card.append(eyebrow, headline, message, visual, actions, note);
     overlay.appendChild(card);
     container.appendChild(overlay);
@@ -535,7 +529,6 @@ class StrictOverlay {
     this.emojiEl = visual;
     this.noteEl = note;
     this.snoozeButton = snooze;
-    this.switchButton = switchTab;
   }
 
   hide() {
@@ -546,7 +539,6 @@ class StrictOverlay {
     this.emojiEl = null;
     this.noteEl = null;
     this.snoozeButton = null;
-    this.switchButton = null;
     document.documentElement.style.removeProperty("overflow");
   }
 
@@ -578,20 +570,6 @@ class StrictOverlay {
           console.error("Failed to snooze from strict overlay", error);
         } finally {
           this.snoozeButton && (this.snoozeButton.disabled = false);
-        }
-      };
-    }
-
-    if (this.switchButton) {
-      this.switchButton.onclick = async () => {
-        this.switchButton!.disabled = true;
-        try {
-          await options.onOpenNewTab();
-          this.hide();
-        } catch (error) {
-          console.error("Failed to open new tab", error);
-        } finally {
-          this.switchButton && (this.switchButton.disabled = false);
         }
       };
     }

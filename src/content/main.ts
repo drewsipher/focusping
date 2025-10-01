@@ -59,10 +59,6 @@ async function snoozeDomain(domain: string, minutes: number) {
   });
 }
 
-async function openFocusTab() {
-  await runtime.sendMessage({ type: "focus-ping::command-open-focus-tab" });
-}
-
 async function handleGentleIntervention(payload: GentleInterventionPayload) {
   console.log(`[${CONTENT_NAMESPACE}] Handling gentle intervention`, payload);
   const settings = await ensureSettings();
@@ -95,7 +91,6 @@ async function handleStrictIntervention(payload: StrictInterventionPayload) {
     snoozeMinutes,
     showGif,
     onSnooze: () => snoozeDomain(payload.domain, snoozeMinutes),
-    onOpenNewTab: () => openFocusTab(),
   });
 }
 

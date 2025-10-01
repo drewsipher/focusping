@@ -509,7 +509,12 @@ function registerListeners() {
   }
 
   listenersRegistered = true;
-  chrome.tabs.onActivated.addListener(() => requestEvaluation("tab-activated"));
+  chrome.tabs.onActivated.addListener((activeInfo) => {
+    if (currentIntervention && currentIntervention.kind === "strict" && currentIntervention.tabId !== activeInfo.tabId) {
+      void clearCurrentIntervention("tab-switched");
+    }
+    requestEvaluation("tab-activated");
+  });
 
   chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     if (changeInfo.status === "complete" || typeof changeInfo.url === "string") {
