@@ -331,9 +331,19 @@ class GentleToast {
   private snoozeButton: HTMLButtonElement | null = null;
 
   private ensureContainer(container: HTMLElement) {
-    if (this.container) {
+    // If we have a container and it's still in the DOM, reuse it
+    if (this.container && this.container.isConnected) {
+      console.log("♻️ [UI] Reusing existing toast container");
       return;
     }
+
+    // Container is missing or detached, create a new one
+    if (this.container) {
+      console.log("🧹 [UI] Old container exists but is detached, cleaning up");
+      this.container = null;
+    }
+
+    console.log("🆕 [UI] Creating new toast container");
 
     const banner = document.createElement("div");
     banner.className = "fp-banner";
@@ -377,6 +387,13 @@ class GentleToast {
     banner.appendChild(toast);
     container.appendChild(banner);
 
+    console.log("📦 [UI] Toast added to DOM", {
+      containerParent: container.parentElement?.tagName,
+      bannerParent: banner.parentElement?.tagName,
+      toastParent: toast.parentElement?.className,
+      isConnected: toast.isConnected,
+    });
+
     this.container = toast;
     this.countdownEl = countdown;
     this.messageEl = message;
@@ -387,6 +404,7 @@ class GentleToast {
   }
 
   hide() {
+    console.log("👋 [UI] GentleToast.hide() called");
     if (this.countdownTimer) {
       window.clearInterval(this.countdownTimer);
       this.countdownTimer = null;
@@ -400,12 +418,35 @@ class GentleToast {
     this.emojiEl = null;
     this.dismissButton = null;
     this.snoozeButton = null;
+    console.log("✅ [UI] GentleToast hidden and cleaned up");
   }
 
   show(container: HTMLElement, payload: GentleInterventionPayload, options: GentleOptions) {
+    console.log("🎨 [UI] GentleToast.show() called", {
+      domain: payload.domain,
+      hasContainer: !!this.container,
+      containerInDOM: this.container?.isConnected,
+    });
+    
     this.ensureContainer(container);
     if (!this.container || !this.countdownEl || !this.messageEl || !this.headlineEl) {
+      console.log("❌ [UI] Missing container elements, cannot show toast");
       return;
+    }
+
+    console.log("✅ [UI] Showing gentle toast for", payload.domain);
+
+    // Check visibility
+    const banner = this.container.parentElement;
+    if (banner) {
+      const computedStyle = window.getComputedStyle(banner);
+      console.log("👁️ [UI] Toast visibility check", {
+        display: computedStyle.display,
+        visibility: computedStyle.visibility,
+        opacity: computedStyle.opacity,
+        zIndex: computedStyle.zIndex,
+        position: computedStyle.position,
+      });
     }
 
     if (this.emojiEl) {
@@ -589,14 +630,26 @@ export class FocusPingUi {
   private strict = new StrictOverlay();
 
   private ensureContainer(): Promise<HTMLDivElement> {
-    if (this.host) {
-      return Promise.resolve(this.host);
+    if (this.host && this.host.isConnected) {
+      return Promise.resolve(this.host.shadowRoot!.querySelector("#focusping-root-inner") as HTMLDivElement);
     }
 
     if (!this.readyPromise) {
       this.readyPromise = new Promise((resolve) => {
         const mount = () => {
-          const host = document.createElement("div");
+          // Check if a root already exists in the document (from previous content script injection)
+          let host = document.getElementById("focusping-root") as HTMLDivElement | null;
+          
+          if (host && host.shadowRoot) {
+            console.log("♻️ [UI] Reusing existing focusping-root from previous injection");
+            this.host = host;
+            const inner = host.shadowRoot.querySelector("#focusping-root-inner") as HTMLDivElement;
+            resolve(inner);
+            return;
+          }
+
+          console.log("🆕 [UI] Creating new focusping-root host element");
+          host = document.createElement("div");
           host.id = "focusping-root";
           host.setAttribute("aria-hidden", "true");
 
@@ -634,10 +687,22 @@ export class FocusPingUi {
 
   async showGentle(payload: GentleInterventionPayload, options: GentleOptions) {
     const container = await this.ensureContainer();
+    console.log("🏠 [UI] Host element check", {
+      hostExists: !!this.host,
+      hostInDOM: this.host?.isConnected,
+      hostId: this.host?.id,
+      hostParent: this.host?.parentElement?.tagName,
+      containerInDOM: container.isConnected,
+    });
+    
     // Make the host visible to assistive technology while the UI is shown so
     // focusing interactive elements (buttons) does not trigger the browser
     // warning about focusing an element hidden via aria-hidden.
     container.removeAttribute("aria-hidden");
+    if (this.host) {
+      this.host.removeAttribute("aria-hidden");
+      console.log("✨ [UI] Removed aria-hidden from host");
+    }
     this.strict.hide();
     this.gentle.show(container, payload, options);
   }

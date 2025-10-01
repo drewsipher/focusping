@@ -76,17 +76,35 @@ function isUrlMatchable(url: string | undefined) {
   return /^https?:/i.test(url);
 }
 
-function secondsToMinutesRounded(ms: number) {
-  return Math.max(0, Math.round(ms / MS_PER_MINUTE));
-}
-
 async function scheduleGentleReminder(domain: string, dueAt: number) {
-  await alarms.clear(gentleAlarmName(domain));
-  await alarms.create(gentleAlarmName(domain), { when: dueAt });
+  const alarmName = gentleAlarmName(domain);
+  await alarms.clear(alarmName);
+  await alarms.create(alarmName, { when: dueAt });
+  const delay = dueAt - Date.now();
+  console.log("⏰ [ALARM] Scheduled gentle reminder", {
+    domain,
+    alarmName,
+    dueAt: new Date(dueAt).toISOString(),
+    delaySeconds: Math.round(delay / 1000),
+  });
+  
+  // Verify alarm was created
+  const allAlarms = await alarms.getAll();
+  console.log("⏰ [ALARM] All alarms after scheduling:", allAlarms.map(a => ({
+    name: a.name,
+    scheduledTime: new Date(a.scheduledTime).toISOString(),
+  })));
 }
 
 async function clearGentleReminder(domain: string | null) {
   if (!domain) {
+    // Clear all gentle reminder alarms
+    const allAlarms = await alarms.getAll();
+    for (const alarm of allAlarms) {
+      if (alarm.name.startsWith(GENTLE_REMINDER_PREFIX)) {
+        await alarms.clear(alarm.name);
+      }
+    }
     return;
   }
   await alarms.clear(gentleAlarmName(domain));
@@ -162,23 +180,25 @@ async function injectContentScriptToTab(tabId: number) {
     });
 
     if (!hasHostPermission) {
-      console.debug(
-        "[Mode Controller] No host permission for",
+      console.log(
+        "⛔ [INJECT] No host permission for",
         origin,
-        "; not attempting injection. To allow injection, add this origin to manifest host_permissions.",
+        "; not attempting injection. Add this origin to manifest host_permissions.",
       );
       return false;
     }
 
     // injecting content script into tab (best-effort)
+    console.log("💉 [INJECT] Injecting content script into tab", tabId, "at origin", origin);
     await scripting.executeScript!({ target: { tabId }, files: ["content.js"] });
     // Give the content script a short moment to initialize.
     await new Promise((r) => setTimeout(r, 150));
+    console.log("✅ [INJECT] Content script injection completed for tab", tabId);
     // injection attempted
     return true;
   } catch (err) {
-    console.warn(
-      "[Mode Controller] Content script injection failed",
+    console.log(
+      "❌ [INJECT] Content script injection failed:",
       err instanceof Error ? err.message : err,
     );
     return false;
@@ -201,30 +221,34 @@ async function sendGentleIntervention(
   };
 
   try {
-    console.debug("[Mode Controller] Sending gentle intervention to tab", tabId);
+    console.log("📨 [MESSAGE] Attempting to send gentle intervention to tab", tabId);
     await tabs.sendMessage(tabId, {
       type: "focusping::gentle-intervention",
       payload,
     });
-    console.debug("[Mode Controller] tabs.sendMessage succeeded for gentle", tabId);
+    console.log("✅ [MESSAGE] tabs.sendMessage succeeded for gentle intervention", tabId);
   } catch (error) {
     // If the receiving end does not exist, try injecting the content script once
     // and retry the message.
     const needInjection =
-      error instanceof Error && /Receiving end does not exist/.test(error.message);
+      error instanceof Error && 
+      (/Receiving end does not exist/.test(error.message) || 
+       /message port closed/.test(error.message));
     if (needInjection) {
-      console.debug(
-        "[Mode Controller] tabs.sendMessage failed; attempting injection and retry",
+      console.log(
+        "💉 [INJECT] Attempting content script injection and retry for tab",
         tabId,
       );
-      await injectContentScriptToTab(tabId);
+      const injected = await injectContentScriptToTab(tabId);
+      console.log("💉 [INJECT] Injection result:", injected);
       try {
         await tabs.sendMessage(tabId, {
           type: "focusping::gentle-intervention",
           payload,
         });
-        console.debug("[Mode Controller] tabs.sendMessage retry succeeded for gentle", tabId);
+        console.log("✅ [INJECT] Retry succeeded for gentle intervention", tabId);
       } catch (err2) {
+        console.log("❌ [INJECT] Retry failed for gentle intervention", tabId, err2);
         handleMissingListener(err2);
       }
     } else {
@@ -234,14 +258,12 @@ async function sendGentleIntervention(
 
   try {
     // Broadcast to any runtime listeners (best-effort)
-    console.debug("[Mode Controller] Broadcasting gentle intervention to runtime listeners", tabId);
     await runtime.sendMessage({
       type: "focusping::gentle-intervention",
       payload: { ...payload, tabId },
     });
-    console.debug("[Mode Controller] runtime.sendMessage succeeded for gentle", tabId);
   } catch (error) {
-    handleMissingListener(error);
+    // Silently ignore - no listeners (popup closed)
   }
 }
 
@@ -310,20 +332,24 @@ async function sendClearIntervention(tabId: number, reason: string) {
     console.debug("[Mode Controller] tabs.sendMessage succeeded for clear", tabId);
   } catch (error) {
     const needInjection =
-      error instanceof Error && /Receiving end does not exist/.test(error.message);
+      error instanceof Error && 
+      (/Receiving end does not exist/.test(error.message) || 
+       /message port closed/.test(error.message));
     if (needInjection) {
-      console.debug(
-        "[Mode Controller] tabs.sendMessage failed; attempting injection and retry",
+      console.log(
+        "💉 [INJECT] Attempting content script injection and retry for clear",
         tabId,
       );
-      await injectContentScriptToTab(tabId);
+      const injected = await injectContentScriptToTab(tabId);
+      console.log("💉 [INJECT] Clear injection result:", injected);
       try {
         await tabs.sendMessage(tabId, {
           type: "focusping::clear-intervention",
           payload: { reason },
         });
-        console.debug("[Mode Controller] tabs.sendMessage retry succeeded for clear", tabId);
+        console.log("✅ [INJECT] Retry succeeded for clear intervention", tabId);
       } catch (err2) {
+        console.log("❌ [INJECT] Retry failed for clear intervention", tabId, err2);
         handleMissingListener(err2);
       }
     } else {
@@ -332,14 +358,12 @@ async function sendClearIntervention(tabId: number, reason: string) {
   }
 
   try {
-    console.debug("[Mode Controller] Broadcasting clear intervention to runtime listeners", tabId);
     await runtime.sendMessage({
       type: "focusping::clear-intervention",
       payload: { reason, tabId },
     });
-    console.debug("[Mode Controller] runtime.sendMessage succeeded for clear", tabId);
   } catch (error) {
-    handleMissingListener(error);
+    // Silently ignore - no listeners (popup closed)
   }
 }
 
@@ -452,43 +476,32 @@ async function handleGentleIntervention(
   domain: string,
   pattern: string | null,
   url: string,
-  session: SessionState,
 ) {
   if (!settings) {
     return;
   }
 
-  const frequencyMinutes = Math.max(1, settings.reminder.frequencyMinutes || 5);
+  // Allow fractional minutes for testing (minimum 0.08 minutes = 5 seconds)
+  const frequencyMinutes = Math.max(0.08, settings.reminder.frequencyMinutes || 5);
   const now = Date.now();
-  const last = session.lastGentleReminderAt[domain] ?? 0;
   const frequencyMs = frequencyMinutes * MS_PER_MINUTE;
-  const elapsed = now - last;
 
   console.debug("[Mode Controller] handleGentleIntervention", {
     domain,
     frequencyMinutes,
-    elapsed,
-    frequencyMs,
     hasCurrentIntervention: !!currentIntervention,
+    currentDomain: currentIntervention?.domain,
+    currentTabId: currentIntervention?.tabId,
+    newTabId: tab.id,
   });
 
+  // If we already have an intervention for this domain and tab, don't create another
   if (
     currentIntervention?.kind === "gentle" &&
     currentIntervention.domain === domain &&
-    currentIntervention.tabId === tab.id &&
-    elapsed < frequencyMs
+    currentIntervention.tabId === tab.id
   ) {
-    const remainingMs = Math.max(0, frequencyMs - elapsed);
-    console.debug("[Mode Controller] Intervention already active, rescheduling", {
-      remainingMs,
-    });
-    if (remainingMs > 0) {
-      await scheduleGentleReminder(domain, now + remainingMs);
-      await mutateSessionState((state) => ({
-        ...state,
-        nextReminderInMinutes: secondsToMinutesRounded(remainingMs),
-      }));
-    }
+    console.debug("[Mode Controller] Intervention already exists, skipping");
     return;
   }
 
@@ -496,8 +509,11 @@ async function handleGentleIntervention(
     return;
   }
 
-  console.debug("[Mode Controller] Sending new gentle intervention");
+  // Send the gentle intervention notification
+  console.log("📤 [NOTIFICATION] Sending new gentle intervention to tab", tab.id);
   await sendGentleIntervention(tab.id, domain, pattern, url, frequencyMinutes);
+
+  // Schedule the next reminder
   await scheduleGentleReminder(domain, now + frequencyMs);
   await updateSessionGentleState(domain, frequencyMinutes, now);
 
@@ -551,33 +567,43 @@ async function evaluate(reason: string) {
   const activeSettings = settings;
 
   if (!state || !activeSettings) {
+    console.debug("Mode controller: no state or settings");
     return;
   }
 
   console.debug("Mode controller evaluating", {
     reason,
     focusStatus: state.status,
+    isMonitoring: state.isMonitoring,
   });
 
   if (!state.isMonitoring || state.status !== "active") {
+    console.debug("Mode controller: not monitoring or not active, clearing intervention");
     await clearCurrentIntervention("focus-inactive");
     return;
   }
 
   const tab = await tabs.getActive();
   if (!tab || typeof tab.id !== "number") {
+    console.debug("Mode controller: no active tab");
     await clearCurrentIntervention("no-active-tab");
     return;
   }
 
   const url = tab.url ?? tab.pendingUrl;
+  console.debug("Mode controller: checking tab", { tabId: tab.id, url });
+  
   if (!isUrlMatchable(url)) {
+    console.debug("Mode controller: URL not matchable");
     await clearCurrentIntervention("unsupported-url");
     return;
   }
 
   const match = matchUrl(url!);
+  console.debug("Mode controller: match result", { matched: match.matched, host: match.host });
+  
   if (!match.matched || !match.host) {
+    console.debug("Mode controller: no match for URL");
     await clearCurrentIntervention("no-match");
     return;
   }
@@ -588,12 +614,18 @@ async function evaluate(reason: string) {
   session = pruneExpiredSnoozes(session, now);
 
   if (await isDomainSnoozed(domain, session, now)) {
+    console.debug("Mode controller: domain is snoozed");
     await clearCurrentIntervention("domain-snoozed");
     return;
   }
 
+  console.debug("Mode controller: proceeding to show intervention", {
+    mode: activeSettings.mode,
+    domain,
+  });
+
   if (activeSettings.mode === "gentle") {
-    await handleGentleIntervention(tab, domain, match.pattern, url!, session);
+    await handleGentleIntervention(tab, domain, match.pattern, url!);
     return;
   }
 
@@ -650,12 +682,22 @@ async function handleSnoozeCommand(payload: SnoozeCommandPayload | undefined) {
 }
 
 async function handleDismissGentleCommand(payload: DismissCommandPayload | undefined) {
+  console.log("👋 [DISMISS] Handling dismiss command", payload);
   const targetDomain = payload?.domain ?? currentIntervention?.domain;
   if (!targetDomain) {
     return;
   }
 
+  await ensureSettingsLoaded();
+  const activeSettings = settings;
+  if (!activeSettings) {
+    return;
+  }
+
   const now = Date.now();
+  const frequencyMinutes = Math.max(0.08, activeSettings.reminder.frequencyMinutes || 5);
+  const frequencyMs = frequencyMinutes * MS_PER_MINUTE;
+
   await mutateSessionState((session) => ({
     ...session,
     lastGentleReminderAt: {
@@ -669,6 +711,14 @@ async function handleDismissGentleCommand(payload: DismissCommandPayload | undef
     await clearGentleReminder(targetDomain);
     await clearCurrentIntervention("gentle-dismissed");
   }
+
+  // Schedule next reminder without showing notification immediately
+  console.log("⏰ [DISMISS] Scheduling next reminder without immediate notification");
+  await scheduleGentleReminder(targetDomain, now + frequencyMs);
+  await updateSessionGentleState(targetDomain, frequencyMinutes, now);
+  
+  // Set currentIntervention to null so the next alarm will trigger a new one
+  currentIntervention = null;
 }
 
 function registerListeners() {
@@ -677,20 +727,31 @@ function registerListeners() {
   }
 
   listenersRegistered = true;
+
   chrome.tabs.onActivated.addListener((activeInfo) => {
-    if (
-      currentIntervention &&
-      currentIntervention.kind === "strict" &&
-      currentIntervention.tabId !== activeInfo.tabId
-    ) {
+    console.debug("[Mode Controller] Tab activated:", activeInfo.tabId);
+
+    // Clear any intervention when switching tabs
+    if (currentIntervention) {
       void clearCurrentIntervention("tab-switched");
     }
+
+    // Cancel any pending alarms when switching tabs
+    void clearGentleReminder(null);
+
     requestEvaluation("tab-activated");
   });
 
   chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     if (changeInfo.status === "complete" || typeof changeInfo.url === "string") {
       if (tab.active) {
+        console.debug("[Mode Controller] Active tab updated:", tabId);
+
+        // Clear current intervention if URL changed
+        if (changeInfo.url && currentIntervention?.tabId === tabId) {
+          void clearCurrentIntervention("url-changed");
+        }
+
         requestEvaluation("tab-updated");
       }
     }
@@ -710,13 +771,13 @@ function registerListeners() {
 
   chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name.startsWith(GENTLE_REMINDER_PREFIX)) {
-      console.debug("[Mode Controller] Gentle reminder alarm fired:", alarm.name);
+      console.log("🔔 [ALARM FIRED] Gentle reminder alarm:", alarm.name);
       currentIntervention = null;
       requestEvaluation("gentle-reminder");
       return;
     }
     if (alarm.name.startsWith(SNOOZE_ALARM_PREFIX)) {
-      console.debug("[Mode Controller] Snooze alarm fired:", alarm.name);
+      console.log("🔔 [ALARM FIRED] Snooze alarm:", alarm.name);
       requestEvaluation("snooze-expired");
     }
   });

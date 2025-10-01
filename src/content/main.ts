@@ -57,6 +57,7 @@ async function snoozeDomain(domain: string, minutes: number) {
 }
 
 async function handleGentleIntervention(payload: GentleInterventionPayload) {
+  console.log("🎯 [CONTENT] handleGentleIntervention called", payload.domain);
   const settings = await ensureSettings();
   const snoozeMinutes = Math.max(
     1,
@@ -70,6 +71,7 @@ async function handleGentleIntervention(payload: GentleInterventionPayload) {
     onDismiss: () => dismissGentle(payload.domain),
     onSnooze: () => snoozeDomain(payload.domain, snoozeMinutes),
   });
+  console.log("✅ [CONTENT] handleGentleIntervention completed");
 }
 
 async function handleStrictIntervention(payload: StrictInterventionPayload) {
@@ -87,29 +89,45 @@ async function handleStrictIntervention(payload: StrictInterventionPayload) {
   });
 }
 
-chrome.runtime.onMessage.addListener((message) => {
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  console.log("📬 [CONTENT] Message received:", message?.type);
+  
   // received message
   if (!message?.type) {
     return;
   }
 
   if (message.type === "focusping::gentle-intervention") {
-    void handleGentleIntervention(message.payload as GentleInterventionPayload);
-    return;
+    console.log("🎯 [CONTENT] Handling gentle intervention message");
+    void handleGentleIntervention(message.payload as GentleInterventionPayload)
+      .then(() => {
+        console.log("✅ [CONTENT] Gentle intervention handled, sending response");
+        sendResponse({ ok: true });
+      })
+      .catch((err) => {
+        console.log("❌ [CONTENT] Gentle intervention failed:", err);
+        sendResponse({ ok: false, error: String(err) });
+      });
+    return true; // Keep message port open for async response
   }
 
   if (message.type === "focusping::strict-intervention") {
-    void handleStrictIntervention(message.payload as StrictInterventionPayload);
-    return;
+    void handleStrictIntervention(message.payload as StrictInterventionPayload)
+      .then(() => sendResponse({ ok: true }))
+      .catch((err) => sendResponse({ ok: false, error: String(err) }));
+    return true; // Keep message port open for async response
   }
 
   if (message.type === "focusping::clear-intervention") {
     ui.clear();
-    return;
+    sendResponse({ ok: true });
+    return true;
   }
 
   if (message.type === "heartbeat") {
     // heartbeat received
+    sendResponse({ ok: true });
+    return true;
   }
 });
 

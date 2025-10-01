@@ -290,6 +290,17 @@ async function bootstrap() {
     // Check if current tab is on the watchlist
     if (currentSettings && currentTab?.url) {
       isCurrentTabOnWatchlist = isUrlOnWatchlist(currentTab.url, currentSettings.blocklist);
+
+      // Update add site button state
+      if (elements.addSiteButton) {
+        if (isCurrentTabOnWatchlist) {
+          elements.addSiteButton.disabled = true;
+          elements.addSiteButton.title = "This site is already being watched";
+        } else {
+          elements.addSiteButton.disabled = false;
+          elements.addSiteButton.title = "Add this site to your watch list";
+        }
+      }
     }
 
     const focusState = await loadFocusState();
