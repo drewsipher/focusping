@@ -597,7 +597,7 @@ export class FocusPingUi {
       this.readyPromise = new Promise((resolve) => {
         const mount = () => {
           const host = document.createElement("div");
-          host.id = "focus-ping-root";
+          host.id = "focusping-root";
           host.setAttribute("aria-hidden", "true");
 
           // Attach an open shadow root so our UI is isolated from page styles.
@@ -606,13 +606,13 @@ export class FocusPingUi {
           // Inject styles into the shadow root so :host and other selectors apply
           // inside the shadow and are isolated from page CSS.
           const style = document.createElement("style");
-          style.id = "focus-ping-styles";
+          style.id = "focusping-styles";
           style.textContent = UI_STYLE;
           shadow.appendChild(style);
 
           // Create an inner container inside the shadow where toasts/overlays mount.
           const inner = document.createElement("div");
-          inner.id = "focus-ping-root-inner";
+          inner.id = "focusping-root-inner";
           shadow.appendChild(inner);
 
           document.body.appendChild(host);

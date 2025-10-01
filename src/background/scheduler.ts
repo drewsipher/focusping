@@ -10,8 +10,8 @@ import { getSessionState, getSettings, onSettingsChanged } from "@/shared/storag
 
 type FocusStateListener = (state: FocusState) => void;
 
-const START_ALARM_NAME = "focus-ping::focus-window-start";
-const END_ALARM_NAME = "focus-ping::focus-window-end";
+const START_ALARM_NAME = "focusping::focus-window-start";
+const END_ALARM_NAME = "focusping::focus-window-end";
 
 let initialized = false;
 let currentState: FocusState | null = null;

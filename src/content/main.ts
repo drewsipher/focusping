@@ -1,13 +1,10 @@
-console.log("Content script loaded on", window.location.hostname);
-
 import { FocusPingUi, type GentleInterventionPayload, type StrictInterventionPayload } from "./ui";
 
-const CONTENT_NAMESPACE = "focus-ping-content";
+const CONTENT_NAMESPACE = "focusping-content";
 
-console.debug(`[${CONTENT_NAMESPACE}] Loaded on`, window.location.hostname);
-
+type RuntimeMessage = Record<string, unknown>;
 const runtime = {
-  sendMessage: (message) =>
+  sendMessage: (message: RuntimeMessage) =>
     new Promise((resolve, reject) => {
       chrome.runtime.sendMessage(message, (response) => {
         if (chrome.runtime.lastError) {
@@ -38,9 +35,8 @@ async function ensureSettings() {
   return currentSettings;
 }
 
-function onSettingsChanged(listener) {
-  // do nothing
-}
+// onSettingsChanged is intentionally a noop in the content script environment
+// content scripts don't track settings changes via this module in the current build
 
 void ensureSettings().catch((error) => {
   console.error(`[${CONTENT_NAMESPACE}] Failed to load settings`, error);
@@ -48,20 +44,19 @@ void ensureSettings().catch((error) => {
 
 async function dismissGentle(domain: string) {
   await runtime.sendMessage({
-    type: "focus-ping::command-dismiss-gentle",
+    type: "focusping::command-dismiss-gentle",
     payload: { domain },
   });
 }
 
 async function snoozeDomain(domain: string, minutes: number) {
   await runtime.sendMessage({
-    type: "focus-ping::command-snooze",
+    type: "focusping::command-snooze",
     payload: { domain, minutes },
   });
 }
 
 async function handleGentleIntervention(payload: GentleInterventionPayload) {
-  console.log(`[${CONTENT_NAMESPACE}] Handling gentle intervention`, payload);
   const settings = await ensureSettings();
   const snoozeMinutes = Math.max(
     1,
@@ -69,7 +64,6 @@ async function handleGentleIntervention(payload: GentleInterventionPayload) {
   );
   const showGif = settings?.reminder.showGifs ?? p.settings.reminder.showGifs;
 
-  console.log(`[${CONTENT_NAMESPACE}] Showing gentle toast`);
   await ui.showGentle(payload, {
     snoozeMinutes,
     showGif,
@@ -79,7 +73,6 @@ async function handleGentleIntervention(payload: GentleInterventionPayload) {
 }
 
 async function handleStrictIntervention(payload: StrictInterventionPayload) {
-  console.log(`[${CONTENT_NAMESPACE}] Handling strict intervention`, payload);
   const settings = await ensureSettings();
   const snoozeMinutes = Math.max(
     1,
@@ -87,7 +80,6 @@ async function handleStrictIntervention(payload: StrictInterventionPayload) {
   );
   const showGif = settings?.reminder.showGifs ?? p.settings.reminder.showGifs;
 
-  console.log(`[${CONTENT_NAMESPACE}] Showing strict overlay`);
   await ui.showStrict(payload, {
     snoozeMinutes,
     showGif,
@@ -96,28 +88,28 @@ async function handleStrictIntervention(payload: StrictInterventionPayload) {
 }
 
 chrome.runtime.onMessage.addListener((message) => {
-  console.log(`[${CONTENT_NAMESPACE}] Received message:`, message?.type);
+  // received message
   if (!message?.type) {
     return;
   }
 
-  if (message.type === "focus-ping::gentle-intervention") {
+  if (message.type === "focusping::gentle-intervention") {
     void handleGentleIntervention(message.payload as GentleInterventionPayload);
     return;
   }
 
-  if (message.type === "focus-ping::strict-intervention") {
+  if (message.type === "focusping::strict-intervention") {
     void handleStrictIntervention(message.payload as StrictInterventionPayload);
     return;
   }
 
-  if (message.type === "focus-ping::clear-intervention") {
+  if (message.type === "focusping::clear-intervention") {
     ui.clear();
     return;
   }
 
   if (message.type === "heartbeat") {
-    console.debug(`[${CONTENT_NAMESPACE}] Heartbeat received`);
+    // heartbeat received
   }
 });
 
@@ -125,7 +117,7 @@ chrome.runtime.onMessage.addListener((message) => {
 // so we don't await a response (background may not send one), which avoids the
 // "message port closed before a response was received" rejection in some cases.
 try {
-  chrome.runtime.sendMessage({ type: "focus-ping::content-ready" }, () => {
+  chrome.runtime.sendMessage({ type: "focusping::content-ready" }, () => {
     // intentionally empty callback to avoid leaving the message port open
   });
 } catch (e) {

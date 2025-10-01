@@ -3,8 +3,8 @@ import { DEFAULT_DISTRACTION_DOMAINS } from "@/shared/blocklist";
 
 export type Mode = "gentle" | "strict";
 
-const SETTINGS_STORAGE_KEY = "focusPing::settings";
-const SESSION_STORAGE_KEY = "focusPing::session";
+const SETTINGS_STORAGE_KEY = "focusping::settings";
+const SESSION_STORAGE_KEY = "focusping::session";
 const CURRENT_SETTINGS_VERSION = 2;
 const CURRENT_SESSION_VERSION = 1;
 

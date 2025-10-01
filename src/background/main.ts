@@ -9,7 +9,7 @@ import { initializeSiteDetector, subscribeToBlocklist, type BlocklistState } fro
 import { initializeModeController } from "./mode-controller";
 
 const EXTENSION_NAME = "Focus Ping";
-const HEARTBEAT_ALARM = "focus-ping::heartbeat";
+const HEARTBEAT_ALARM = "focusping::heartbeat";
 
 const BADGE_LOOKUP: Record<FocusState["status"], { text: string; color: string }> = {
   active: { text: "ON", color: "#16a34a" },
@@ -34,7 +34,7 @@ async function applyBadgeState(state: FocusState) {
 
 async function broadcastFocusState(state: FocusState) {
   try {
-    await runtime.sendMessage({ type: "focus-ping::focus-state", payload: state });
+    await runtime.sendMessage({ type: "focusping::focus-state", payload: state });
   } catch (error) {
     if (error instanceof Error && /Receiving end does not exist/.test(error.message)) {
       return;
@@ -51,7 +51,7 @@ function handleFocusState(state: FocusState) {
 async function broadcastBlocklist(state: BlocklistState, reason: string) {
   try {
     await runtime.sendMessage({
-      type: "focus-ping::blocklist-updated",
+      type: "focusping::blocklist-updated",
       payload: {
         patterns: state.patterns,
         updatedAtIso: state.updatedAtIso,
@@ -131,8 +131,12 @@ async function injectContentIntoOpenTabs() {
       }
 
       const hasHostPerm = await new Promise<boolean>((resolve) => {
+        if (!chrome.permissions || typeof chrome.permissions.contains !== "function") {
+          resolve(false);
+          return;
+        }
         try {
-          (chrome as any).permissions.contains({ origins: [origin + "/*"] }, (granted: boolean) =>
+          chrome.permissions.contains({ origins: [origin + "/*"] }, (granted: boolean) =>
             resolve(Boolean(granted)),
           );
         } catch (e) {
@@ -143,15 +147,25 @@ async function injectContentIntoOpenTabs() {
       if (!hasHostPerm) continue;
 
       try {
-        if ((chrome as any).scripting && typeof (chrome as any).scripting.executeScript === "function") {
-          await (chrome as any).scripting.executeScript({ target: { tabId }, files: ["content.js"] });
+        if (chrome.scripting && typeof chrome.scripting.executeScript === "function") {
+          await chrome.scripting.executeScript({
+            target: { tabId },
+            files: ["content.js"],
+          });
         }
       } catch (err) {
-        console.debug("Failed to inject content script into tab", tabId, err instanceof Error ? err.message : err);
+        console.debug(
+          "Failed to inject content script into tab",
+          tabId,
+          err instanceof Error ? err.message : err,
+        );
       }
     }
   } catch (err) {
-    console.debug("Failed to enumerate tabs for injection", err instanceof Error ? err.message : err);
+    console.debug(
+      "Failed to enumerate tabs for injection",
+      err instanceof Error ? err.message : err,
+    );
   }
 }
 

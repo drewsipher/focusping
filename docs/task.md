@@ -44,10 +44,10 @@
   - [x] 3.4.3 Add GIF/visual flair toggles with real-time preview.
 
 ## 4. Cleanup and robustness
-- [ ] **4.1 Simplify code, referring to the requirements document to make sure features that are implemented are still working, but code is as simple as possible.**
-- [ ] **4.2 Rename all references of "focus-ping" to focusping**
-- [ ] **4.3 Remove debugging console outputs**
-
+- [x] **4.1 Simplify code, referring to the requirements document to make sure features that are implemented are still working, but code is as simple as possible.**
+- [x] **4.2 Rename all references of "focus-ping" to focusping**
+- [x] **4.3 Remove debugging console outputs**
+- [x] **4.4 Run the linting and formatting and solve any addition issues**
 
 ## 5. Assets & Content
 - [ ] **5.1 Curate humorous GIF pack and static fallback images.**

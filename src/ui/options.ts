@@ -58,10 +58,10 @@ function isMissingReceiverError(error: unknown) {
 
 async function sendStateUpdateMessage() {
   try {
-    await runtime.sendMessage({ type: "focus-ping::state-updated" });
+    await runtime.sendMessage({ type: "focusping::state-updated" });
   } catch (error) {
     if (isMissingReceiverError(error)) {
-      console.debug("No runtime listeners for state update", error);
+      // No runtime listeners for state update — ignore
       return;
     }
     console.error("Failed to broadcast state update", error);

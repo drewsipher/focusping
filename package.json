@@ -1,5 +1,5 @@
 {
-  "name": "focus-ping",
+  "name": "focusping",
   "version": "0.1.0",
   "description": "Chrome extension that nudges you back to focus on distracting sites.",
   "type": "module",
