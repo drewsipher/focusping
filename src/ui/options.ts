@@ -299,15 +299,36 @@ async function handleBlocklistSubmit(event: SubmitEvent) {
   }
 
   let hostname: string | null = null;
+  
+  // Try to parse as URL first
   try {
     const parsed = new URL(raw.includes("://") ? raw : `https://${raw}`);
-    hostname = parsed.hostname.replace(/^www\./, "").toLowerCase();
+    hostname = parsed.hostname;
   } catch {
-    // fall through
+    // If URL parsing fails, treat it as a plain domain
+    // Clean it up: remove protocol, www, paths, etc.
+    const cleaned = raw
+      .replace(/^(https?:\/\/)?(www\.)?/i, "") // Remove protocol and www
+      .replace(/\/.*$/, "") // Remove path
+      .replace(/:\d+$/, "") // Remove port
+      .toLowerCase();
+
+    // Basic validation: should look like a domain
+    if (
+      cleaned &&
+      /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/i.test(cleaned)
+    ) {
+      hostname = cleaned;
+    }
+  }
+
+  // Remove www. prefix if present
+  if (hostname) {
+    hostname = hostname.replace(/^www\./, "").toLowerCase();
   }
 
   if (!hostname) {
-    setDomainError("Please enter a valid domain.");
+    setDomainError("Please enter a valid domain (e.g., example.com)");
     input.focus();
     input.select();
     return;
