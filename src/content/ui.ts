@@ -3,7 +3,6 @@ export interface GentleInterventionPayload {
   pattern: string | null;
   url: string;
   triggeredAtIso: string;
-  repeatAfterMinutes: number;
 }
 
 export interface StrictInterventionPayload {
@@ -289,11 +288,30 @@ const UI_STYLE = /* css */ `
   }
 `;
 
+const GENTLE_HEADLINES = [
+  "Hey look over here!",
+  "Time to refocus!",
+  "Your attention, please!",
+  "Stay on track!",
+  "Focus mode: activated!",
+  "Back to productivity!",
+  "Eyes on the prize!",
+  "Stay sharp!",
+  "Keep pushing forward!",
+  "Focus up!",
+];
+
 const GENTLE_MESSAGES = [
-  "Quick stretch, then back into flow?",
-  "You're so close—let's finish the task first!",
-  "Future you says thanks for staying on track.",
-  "Deep breath. What's the one thing you meant to do?",
+  "Your deadlines did not sign up for this. Come back to the flow!",
+  "Stop doomscrolling, start doing.",
+  "Your goals just called — it wants your attention back.",
+  "Focus is a superpower. Unleash it!",
+  "This site is a productivity black hole. Escape velocity required.",
+  "Your future self will thank you for closing this tab.",
+  "Quick! Name three things you want to accomplish today.",
+  "Funny how time flies when you're procrastinating.",
+  "Oh look, a squirrel! Just kidding, focus up!",
+  "Only you can prevent productivity fires.",
 ];
 
 const STRICT_MESSAGES = [
@@ -455,9 +473,10 @@ class GentleToast {
     }
 
     const playful = pickRandom(GENTLE_MESSAGES);
-    this.headlineEl.textContent = "Quick refocus break";
-    this.messageEl.innerHTML = `You're visiting <strong>${payload.domain}</strong>. ${playful}`;
-    this.countdownEl.textContent = `Next reminder in ${payload.repeatAfterMinutes} min`;
+    const headline = pickRandom(GENTLE_HEADLINES);
+    this.headlineEl.textContent = headline;
+    this.messageEl.innerHTML = playful;
+    this.countdownEl.textContent = `Next reminder `;
 
     if (this.dismissButton) {
       this.dismissButton.onclick = async () => {
@@ -492,24 +511,6 @@ class GentleToast {
         this.snoozeButton.hidden = true;
       }
     }
-
-    const triggeredAt = Date.parse(payload.triggeredAtIso);
-    const repeatMinutes = Math.max(1, payload.repeatAfterMinutes || 1);
-    this.dueAt = triggeredAt + repeatMinutes * 60_000;
-    this.updateCountdown();
-    if (this.countdownTimer) {
-      window.clearInterval(this.countdownTimer);
-    }
-    this.countdownTimer = window.setInterval(() => this.updateCountdown(), 1000);
-  }
-
-  private updateCountdown() {
-    if (!this.countdownEl || !this.dueAt) {
-      return;
-    }
-    const now = Date.now();
-    const remaining = this.dueAt - now;
-    this.countdownEl.textContent = `Next reminder in ${formatCountdown(remaining)}`;
   }
 }
 
