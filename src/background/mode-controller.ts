@@ -992,7 +992,9 @@ function registerListeners() {
     }
     if (alarm.name.startsWith(SNOOZE_ALARM_PREFIX)) {
       console.log(`🔔 [${timestamp()}] [ALARM FIRED] Snooze alarm:`, alarm.name);
-      requestEvaluation("snooze-expired");
+      // Extract domain from alarm name and show intervention immediately (don't start a new timer)
+      const domain = alarm.name.replace(SNOOZE_ALARM_PREFIX, "");
+      void handleGentleAlarmFired(domain);
     }
   });
 
