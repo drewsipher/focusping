@@ -527,11 +527,10 @@ async function handleGentleIntervention(
     return;
   }
 
-  // Send the gentle intervention notification
-  console.log("📤 [NOTIFICATION] Sending new gentle intervention to tab", tab.id);
-  await sendGentleIntervention(tab.id, domain, pattern, url, frequencyMinutes);
+  // Don't send notification immediately - just schedule the alarm
+  console.log("⏰ [TIMER START] Starting timer for", domain, "without immediate notification");
 
-  // Schedule the next reminder
+  // Schedule the first reminder
   await scheduleGentleReminder(domain, now + frequencyMs);
   await updateSessionGentleState(domain, frequencyMinutes, now);
 
@@ -763,6 +762,75 @@ async function handleFrequencyChanged(payload: { frequencyMinutes: number } | un
   requestEvaluation("frequency-changed");
 }
 
+async function handleGentleAlarmFired(domain: string) {
+  console.log("🔔 [ALARM] Processing gentle alarm for domain:", domain);
+  
+  await ensureSettingsLoaded();
+  await ensureFocusState();
+  const activeSettings = settings;
+  const state = focusState;
+
+  if (!state || !activeSettings || !state.isMonitoring || state.status !== "active") {
+    console.log("⏭️ [ALARM] Skipping - not in active focus period");
+    currentIntervention = null;
+    return;
+  }
+
+  // Check if user is still on this domain
+  const tab = await tabs.getActive();
+  if (!tab || typeof tab.id !== "number") {
+    console.log("⏭️ [ALARM] Skipping - no active tab");
+    currentIntervention = null;
+    return;
+  }
+
+  const url = tab.url ?? tab.pendingUrl;
+  if (!isUrlMatchable(url)) {
+    console.log("⏭️ [ALARM] Skipping - URL not matchable");
+    currentIntervention = null;
+    return;
+  }
+
+  const match = matchUrl(url!);
+  if (!match.matched || match.host !== domain) {
+    console.log("⏭️ [ALARM] Skipping - user switched away from", domain);
+    currentIntervention = null;
+    return;
+  }
+
+  // Check if domain is snoozed
+  const now = Date.now();
+  let session = await getSessionState();
+  session = pruneExpiredSnoozes(session, now);
+  
+  if (await isDomainSnoozed(domain, session, now)) {
+    console.log("⏭️ [ALARM] Skipping - domain is snoozed");
+    currentIntervention = null;
+    return;
+  }
+
+  // Send the notification
+  const frequencyMinutes = Math.max(0.08, activeSettings.reminder.frequencyMinutes || 5);
+  const frequencyMs = frequencyMinutes * MS_PER_MINUTE;
+  
+  console.log("📤 [ALARM] Sending notification to tab", tab.id);
+  await sendGentleIntervention(tab.id, domain, match.pattern, url!, frequencyMinutes);
+
+  // Schedule the next reminder
+  await scheduleGentleReminder(domain, now + frequencyMs);
+  await updateSessionGentleState(domain, frequencyMinutes, now);
+
+  currentIntervention = {
+    kind: "gentle",
+    domain,
+    pattern: match.pattern,
+    tabId: tab.id,
+    url: url!,
+    triggeredAt: now,
+    reminderDueAt: now + frequencyMs,
+  };
+}
+
 function registerListeners() {
   if (listenersRegistered) {
     return;
@@ -814,8 +882,9 @@ function registerListeners() {
   chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name.startsWith(GENTLE_REMINDER_PREFIX)) {
       console.log("🔔 [ALARM FIRED] Gentle reminder alarm:", alarm.name);
-      currentIntervention = null;
-      requestEvaluation("gentle-reminder");
+      // Extract domain from alarm name
+      const domain = alarm.name.replace(GENTLE_REMINDER_PREFIX, "");
+      void handleGentleAlarmFired(domain);
       return;
     }
     if (alarm.name.startsWith(SNOOZE_ALARM_PREFIX)) {
