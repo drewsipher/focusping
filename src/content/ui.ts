@@ -34,6 +34,8 @@ const UI_STYLE = /* css */ `
   :host {
     all: initial;
     font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
     color: #0f172a;
   }
 
@@ -74,7 +76,7 @@ const UI_STYLE = /* css */ `
     align-items: center;
     gap: 8px;
     font-weight: 700;
-    font-size: 0.8rem;
+    font-size: 0.8em;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: rgba(15, 23, 42, 0.75);
@@ -82,13 +84,13 @@ const UI_STYLE = /* css */ `
 
   .fp-toast__headline {
     margin: 0;
-    font-size: 1.35rem;
+    font-size: 1.35em;
     line-height: 1.1;
   }
 
   .fp-text-subtle {
     margin: 0;
-    font-size: 0.95rem;
+    font-size: 0.95em;
     color: rgba(15, 23, 42, 0.78);
   }
 
@@ -103,7 +105,7 @@ const UI_STYLE = /* css */ `
     border-radius: 999px;
     padding: 10px 18px;
     font-weight: 600;
-    font-size: 0.95rem;
+    font-size: 0.95em;
     cursor: pointer;
     transition: transform 150ms ease, box-shadow 150ms ease;
     display: inline-flex;
@@ -139,7 +141,7 @@ const UI_STYLE = /* css */ `
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 2.25rem;
+    font-size: 2.25em;
     animation: fp-wiggle 2.4s ease-in-out infinite;
   }
 
@@ -164,7 +166,7 @@ const UI_STYLE = /* css */ `
 
   .fp-overlay__eyebrow {
     margin: 0;
-    font-size: 0.85rem;
+    font-size: 0.85em;
     font-weight: 700;
     letter-spacing: 0.1em;
     text-transform: uppercase;
@@ -173,7 +175,7 @@ const UI_STYLE = /* css */ `
 
   .fp-overlay__headline {
     margin: 0;
-    font-size: 2rem;
+    font-size: 2em;
     line-height: 1.1;
   }
 
@@ -184,7 +186,7 @@ const UI_STYLE = /* css */ `
     border-radius: 20px;
     background: linear-gradient(140deg, rgba(59, 130, 246, 0.55), rgba(249, 115, 22, 0.65));
     min-height: 160px;
-    font-size: 3rem;
+    font-size: 3em;
     animation: fp-float 4s ease-in-out infinite;
   }
 
@@ -195,7 +197,7 @@ const UI_STYLE = /* css */ `
   }
 
   .fp-note {
-    font-size: 0.9rem;
+    font-size: 0.9em;
     color: rgba(15, 23, 42, 0.65);
     margin: 0;
   }
@@ -411,8 +413,26 @@ class GentleToast {
 
     console.log("✅ [UI] Showing gentle toast for", payload.domain);
 
-    // Check visibility
+    // Debug font size and computed styles
     const banner = this.container.parentElement;
+    const host = banner?.getRootNode() as ShadowRoot;
+    const hostElement = host?.host as HTMLElement;
+    
+    if (hostElement) {
+      const hostStyles = window.getComputedStyle(hostElement);
+      const rootStyles = window.getComputedStyle(document.documentElement);
+      const bodyStyles = window.getComputedStyle(document.body);
+      
+      console.log("🔍 [DEBUG] Font size debugging:", {
+        site: window.location.hostname,
+        rootFontSize: rootStyles.fontSize,
+        bodyFontSize: bodyStyles.fontSize,
+        hostFontSize: hostStyles.fontSize,
+        hostLineHeight: hostStyles.lineHeight,
+      });
+    }
+
+    // Check visibility
     if (banner) {
       const computedStyle = window.getComputedStyle(banner);
       console.log("👁️ [UI] Toast visibility check", {
@@ -421,6 +441,16 @@ class GentleToast {
         opacity: computedStyle.opacity,
         zIndex: computedStyle.zIndex,
         position: computedStyle.position,
+      });
+    }
+    
+    // Debug text element styles
+    if (this.headlineEl) {
+      const headlineStyles = window.getComputedStyle(this.headlineEl);
+      console.log("🔍 [DEBUG] Toast headline styles:", {
+        fontSize: headlineStyles.fontSize,
+        lineHeight: headlineStyles.lineHeight,
+        fontFamily: headlineStyles.fontFamily,
       });
     }
 
@@ -559,6 +589,37 @@ class StrictOverlay {
     this.ensureContainer(container);
     if (!this.container || !this.headlineEl || !this.messageEl || !this.noteEl) {
       return;
+    }
+
+    console.log("✅ [UI] Showing strict overlay for", payload.domain);
+
+    // Debug font size and computed styles
+    const overlay = this.container;
+    const host = overlay?.getRootNode() as ShadowRoot;
+    const hostElement = host?.host as HTMLElement;
+    
+    if (hostElement) {
+      const hostStyles = window.getComputedStyle(hostElement);
+      const rootStyles = window.getComputedStyle(document.documentElement);
+      const bodyStyles = window.getComputedStyle(document.body);
+      
+      console.log("🔍 [DEBUG] Font size debugging:", {
+        site: window.location.hostname,
+        rootFontSize: rootStyles.fontSize,
+        bodyFontSize: bodyStyles.fontSize,
+        hostFontSize: hostStyles.fontSize,
+        hostLineHeight: hostStyles.lineHeight,
+      });
+    }
+    
+    // Debug text element styles
+    if (this.headlineEl) {
+      const headlineStyles = window.getComputedStyle(this.headlineEl);
+      console.log("🔍 [DEBUG] Overlay headline styles:", {
+        fontSize: headlineStyles.fontSize,
+        lineHeight: headlineStyles.lineHeight,
+        fontFamily: headlineStyles.fontFamily,
+      });
     }
 
     document.documentElement.style.setProperty("overflow", "hidden");
