@@ -10,18 +10,17 @@
     <main class="options">
       <header class="options-header">
         <h1>FocusPing Settings</h1>
-        <p class="options-subtitle">Configure your focus monitoring preferences</p>
       </header>
 
       <section class="settings-section">
-        <h2>Mode</h2>
+        <h2>Focus Settings</h2>
+        
         <div class="mode-selector">
           <label class="mode-card">
             <input type="radio" name="mode" value="gentle" />
             <div class="mode-card__content">
               <div class="mode-card__icon">💬</div>
               <div class="mode-card__title">Gentle</div>
-              <div class="mode-card__description">Dismissible toast notifications</div>
             </div>
           </label>
           <label class="mode-card">
@@ -29,14 +28,12 @@
             <div class="mode-card__content">
               <div class="mode-card__icon">🛡️</div>
               <div class="mode-card__title">Strict</div>
-              <div class="mode-card__description">Full-page overlay intervention</div>
             </div>
           </label>
         </div>
-      </section>
 
-      <section class="settings-section">
-        <h2>Focus schedule</h2>
+        <div class="settings-divider"></div>
+
         <div class="time-inputs">
           <label class="time-input">
             <span class="time-input__label">Start time</span>
@@ -51,10 +48,9 @@
           <input id="schedule-paused" type="checkbox" />
           <span>Pause monitoring outside schedule</span>
         </label>
-      </section>
 
-      <section class="settings-section">
-        <h2>Reminder behavior</h2>
+        <div class="settings-divider"></div>
+
         <div class="slider-control">
           <label for="reminder-frequency" class="slider-control__label">
             <span>Reminder frequency</span>
