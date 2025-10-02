@@ -14,13 +14,11 @@ type Elements = {
   scheduleEnd: HTMLInputElement | null;
   schedulePaused: HTMLInputElement | null;
   reminderFrequency: HTMLInputElement | null;
-  gifToggle: HTMLInputElement | null;
+  reminderValue: HTMLElement | null;
   blocklistForm: HTMLFormElement | null;
   domainInput: HTMLInputElement | null;
   blocklistBody: HTMLTableSectionElement | null;
   domainError: HTMLParagraphElement | null;
-  gifPreview: HTMLDivElement | null;
-  gifPreviewState: HTMLElement | null;
 };
 
 const query = <T extends HTMLElement>(id: string) => document.getElementById(id) as T | null;
@@ -32,13 +30,11 @@ function collectElements(): Elements {
     scheduleEnd: query<HTMLInputElement>("schedule-end"),
     schedulePaused: query<HTMLInputElement>("schedule-paused"),
     reminderFrequency: query<HTMLInputElement>("reminder-frequency"),
-    gifToggle: query<HTMLInputElement>("gif-toggle"),
+    reminderValue: query<HTMLElement>("reminder-value"),
     blocklistForm: query<HTMLFormElement>("blocklist-form"),
     domainInput: query<HTMLInputElement>("domain-input"),
     blocklistBody: query<HTMLTableSectionElement>("blocklist-body"),
     domainError: query<HTMLParagraphElement>("domain-error"),
-    gifPreview: query<HTMLDivElement>("gif-preview"),
-    gifPreviewState: query<HTMLElement>("gif-preview-state"),
   };
 }
 
@@ -80,18 +76,18 @@ function setDomainError(message: string | null) {
   }
 }
 
-function updateGifPreview(showGifs: boolean) {
-  if (elements.gifPreview) {
-    elements.gifPreview.classList.toggle("gif-preview--off", !showGifs);
-    elements.gifPreview.dataset.state = showGifs ? "on" : "off";
-    elements.gifPreview.setAttribute(
-      "aria-label",
-      showGifs ? "Humorous GIF preview showing a vibrant overlay" : "Humorous GIF preview disabled",
-    );
-  }
-
-  if (elements.gifPreviewState) {
-    elements.gifPreviewState.textContent = showGifs ? "on" : "off";
+function updateReminderValueDisplay(seconds: number) {
+  if (!elements.reminderValue) return;
+  
+  if (seconds < 60) {
+    elements.reminderValue.textContent = `${seconds} sec`;
+  } else {
+    const minutes = seconds / 60;
+    if (minutes >= 1 && minutes % 1 === 0) {
+      elements.reminderValue.textContent = `${minutes} min`;
+    } else {
+      elements.reminderValue.textContent = `${minutes.toFixed(1)} min`;
+    }
   }
 }
 
@@ -172,14 +168,12 @@ function renderSettings(settings: Settings) {
   }
 
   if (elements.reminderFrequency) {
-    elements.reminderFrequency.value = String(settings.reminder.frequencyMinutes);
+    // Convert minutes to seconds for slider
+    const seconds = Math.round(settings.reminder.frequencyMinutes * 60);
+    elements.reminderFrequency.value = String(seconds);
+    updateReminderValueDisplay(seconds);
   }
 
-  if (elements.gifToggle) {
-    elements.gifToggle.checked = Boolean(settings.reminder.showGifs);
-  }
-
-  updateGifPreview(Boolean(settings.reminder.showGifs));
   renderBlocklist(settings);
   setDomainError(null);
 }
@@ -279,27 +273,12 @@ function handleSchedulePausedChange() {
   }));
 }
 
-function handleReminderFrequencyChange() {
-  const fallback =
-    currentSettings?.reminder.frequencyMinutes ?? defaults.settings.reminder.frequencyMinutes;
-  const minutes = readMinutes(elements.reminderFrequency, fallback);
+function handleReminderFrequencyChange(minutes: number) {
   void applyUpdate((settings) => ({
     ...settings,
     reminder: {
       ...settings.reminder,
       frequencyMinutes: minutes,
-    },
-  }));
-}
-
-function handleGifToggleChange() {
-  const showGifs = Boolean(elements.gifToggle?.checked);
-  updateGifPreview(showGifs);
-  void applyUpdate((settings) => ({
-    ...settings,
-    reminder: {
-      ...settings.reminder,
-      showGifs,
     },
   }));
 }
@@ -411,10 +390,21 @@ async function bootstrap() {
   elements.scheduleEnd?.addEventListener("blur", handleScheduleEndChange);
   elements.scheduleEnd?.addEventListener("input", handleScheduleEndChange);
   elements.schedulePaused?.addEventListener("change", handleSchedulePausedChange);
-  elements.reminderFrequency?.addEventListener("change", handleReminderFrequencyChange);
-  elements.reminderFrequency?.addEventListener("blur", handleReminderFrequencyChange);
-  elements.reminderFrequency?.addEventListener("input", handleReminderFrequencyChange);
-  elements.gifToggle?.addEventListener("change", handleGifToggleChange);
+  
+  // Reminder frequency slider - update display on input, save on change
+  elements.reminderFrequency?.addEventListener("input", (event) => {
+    const target = event.target as HTMLInputElement;
+    const seconds = parseInt(target.value, 10);
+    updateReminderValueDisplay(seconds);
+  });
+  
+  elements.reminderFrequency?.addEventListener("change", (event) => {
+    const target = event.target as HTMLInputElement;
+    const seconds = parseInt(target.value, 10);
+    const minutes = seconds / 60;
+    handleReminderFrequencyChange(minutes);
+  });
+  
   elements.domainInput?.addEventListener("input", () => setDomainError(null));
   elements.blocklistForm?.addEventListener("submit", (event) => {
     handleBlocklistSubmit(event).catch(console.error);

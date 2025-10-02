@@ -8,43 +8,76 @@
   </head>
   <body>
     <main class="options">
-      <h1>FocusPing Settings</h1>
-      <section>
+      <header class="options-header">
+        <h1>FocusPing Settings</h1>
+        <p class="options-subtitle">Configure your focus monitoring preferences</p>
+      </header>
+
+      <section class="settings-section">
         <h2>Mode</h2>
-        <label><input type="radio" name="mode" value="gentle" /> Gentle</label>
-        <label><input type="radio" name="mode" value="strict" /> Strict</label>
+        <div class="mode-selector">
+          <label class="mode-card">
+            <input type="radio" name="mode" value="gentle" />
+            <div class="mode-card__content">
+              <div class="mode-card__icon">💬</div>
+              <div class="mode-card__title">Gentle</div>
+              <div class="mode-card__description">Dismissible toast notifications</div>
+            </div>
+          </label>
+          <label class="mode-card">
+            <input type="radio" name="mode" value="strict" />
+            <div class="mode-card__content">
+              <div class="mode-card__icon">🛡️</div>
+              <div class="mode-card__title">Strict</div>
+              <div class="mode-card__description">Full-page overlay intervention</div>
+            </div>
+          </label>
+        </div>
       </section>
-      <section>
+
+      <section class="settings-section">
         <h2>Focus schedule</h2>
-        <label>
-          Start
-          <input id="schedule-start" type="time" />
+        <div class="time-inputs">
+          <label class="time-input">
+            <span class="time-input__label">Start time</span>
+            <input id="schedule-start" type="time" />
+          </label>
+          <label class="time-input">
+            <span class="time-input__label">End time</span>
+            <input id="schedule-end" type="time" />
+          </label>
+        </div>
+        <label class="checkbox-label">
+          <input id="schedule-paused" type="checkbox" />
+          <span>Pause monitoring outside schedule</span>
         </label>
-        <label>
-          End
-          <input id="schedule-end" type="time" />
-        </label>
-        <label><input id="schedule-paused" type="checkbox" /> Pause outside schedule</label>
       </section>
-      <section>
+
+      <section class="settings-section">
         <h2>Reminder behavior</h2>
-        <label>
-          Reminder cadence (minutes)
-          <input id="reminder-frequency" type="number" min="0.08" max="60" step="0.01" />
-        </label>
-        <label><input id="gif-toggle" type="checkbox" /> Show humorous GIFs</label>
-        <div id="gif-preview" class="gif-preview" role="img" aria-live="polite">
-          <div class="gif-preview__media" aria-hidden="true"></div>
-          <div class="gif-preview__content">
-            <p class="gif-preview__eyebrow">Strict mode overlay preview</p>
-            <p class="gif-preview__headline">"Step away from the cat videos!"</p>
-            <p class="gif-preview__caption">
-              GIF flair is currently <strong id="gif-preview-state">on</strong>.
-            </p>
+        <div class="slider-control">
+          <label for="reminder-frequency" class="slider-control__label">
+            <span>Reminder frequency</span>
+            <span id="reminder-value" class="slider-control__value">5 sec</span>
+          </label>
+          <input 
+            id="reminder-frequency" 
+            type="range" 
+            min="5" 
+            max="300" 
+            step="1" 
+            value="5"
+            class="slider-control__slider"
+          />
+          <div class="slider-control__marks">
+            <span>5s</span>
+            <span>1m</span>
+            <span>5m</span>
           </div>
         </div>
       </section>
-      <section>
+
+      <section class="settings-section">
         <h2>Distracting sites</h2>
         <form id="blocklist-form" class="blocklist-form">
           <input
