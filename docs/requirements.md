@@ -1,4 +1,4 @@
-# Focus Ping Requirements
+# FocusPing Requirements
 
 ## 1. Product Overview
 - **Product name:** FocusPing (Chrome extension)

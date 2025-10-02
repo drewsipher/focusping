@@ -1,4 +1,4 @@
-# Focus Ping Task Board
+# FocusPing Task Board
 
 ## 1. Foundation & Setup
 - [x] **1.1 Initialize project scaffold**

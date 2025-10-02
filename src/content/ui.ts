@@ -373,7 +373,7 @@ class GentleToast {
 
     const header = document.createElement("div");
     header.className = "fp-toast__header";
-    header.innerHTML = `<span>Focus Ping</span>`;
+    header.innerHTML = `<span>FocusPing</span>`;
 
     const headline = document.createElement("h2");
     headline.className = "fp-toast__headline";

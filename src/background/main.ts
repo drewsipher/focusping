@@ -8,7 +8,7 @@ import {
 import { initializeSiteDetector, subscribeToBlocklist, type BlocklistState } from "./site-detector";
 import { initializeModeController } from "./mode-controller";
 
-const EXTENSION_NAME = "Focus Ping";
+const EXTENSION_NAME = "FocusPing";
 const HEARTBEAT_ALARM = "focusping::heartbeat";
 
 const BADGE_LOOKUP: Record<FocusState["status"], { text: string; color: string }> = {
