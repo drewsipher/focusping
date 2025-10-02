@@ -24,11 +24,19 @@ async function dismissGentle(domain: string) {
   });
 }
 
-// Snooze now restarts the timer (old dismiss behavior)
-async function snoozeWithTimer(domain: string) {
+// Snooze (for gentle mode) now restarts the timer (old dismiss behavior)
+async function snoozeGentleWithTimer(domain: string) {
   await runtime.sendMessage({
     type: "focusping::command-dismiss-gentle",
     payload: { domain },
+  });
+}
+
+// Snooze (for strict mode) actually snoozes the domain
+async function snoozeStrictDomain(domain: string, minutes: number) {
+  await runtime.sendMessage({
+    type: "focusping::command-snooze",
+    payload: { domain, minutes },
   });
 }
 
@@ -41,7 +49,7 @@ async function handleGentleIntervention(payload: GentleInterventionPayload) {
     reminderMinutes,
     showGif,
     onDismiss: () => dismissGentle(payload.domain),
-    onSnooze: () => snoozeWithTimer(payload.domain),
+    onSnooze: () => snoozeGentleWithTimer(payload.domain),
   });
   console.log("✅ [CONTENT] handleGentleIntervention completed");
 }
@@ -53,7 +61,7 @@ async function handleStrictIntervention(payload: StrictInterventionPayload) {
   await ui.showStrict(payload, {
     reminderMinutes,
     showGif,
-    onSnooze: () => snoozeWithTimer(payload.domain),
+    onSnooze: () => snoozeStrictDomain(payload.domain, reminderMinutes),
   });
 }
 
