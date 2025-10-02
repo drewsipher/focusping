@@ -1,7 +1,5 @@
 import { FocusPingUi, type GentleInterventionPayload, type StrictInterventionPayload } from "./ui";
 
-const CONTENT_NAMESPACE = "focusping-content";
-
 type RuntimeMessage = Record<string, unknown>;
 const runtime = {
   sendMessage: (message: RuntimeMessage) =>
@@ -16,31 +14,7 @@ const runtime = {
     }),
 };
 
-const p = {
-  settings: {
-    reminder: {
-      snoozeMinutes: 10,
-      showGifs: true,
-    },
-  },
-};
-
 const ui = new FocusPingUi();
-let currentSettings = null;
-
-async function ensureSettings() {
-  if (!currentSettings) {
-    currentSettings = p.settings;
-  }
-  return currentSettings;
-}
-
-// onSettingsChanged is intentionally a noop in the content script environment
-// content scripts don't track settings changes via this module in the current build
-
-void ensureSettings().catch((error) => {
-  console.error(`[${CONTENT_NAMESPACE}] Failed to load settings`, error);
-});
 
 async function dismissGentle(domain: string) {
   await runtime.sendMessage({
@@ -58,12 +32,8 @@ async function snoozeDomain(domain: string, minutes: number) {
 
 async function handleGentleIntervention(payload: GentleInterventionPayload) {
   console.log("🎯 [CONTENT] handleGentleIntervention called", payload.domain);
-  const settings = await ensureSettings();
-  const snoozeMinutes = Math.max(
-    1,
-    settings?.reminder.snoozeMinutes ?? p.settings.reminder.snoozeMinutes,
-  );
-  const showGif = settings?.reminder.showGifs ?? p.settings.reminder.showGifs;
+  const snoozeMinutes = payload.snoozeMinutes;
+  const showGif = payload.showGif;
 
   await ui.showGentle(payload, {
     snoozeMinutes,
@@ -75,12 +45,8 @@ async function handleGentleIntervention(payload: GentleInterventionPayload) {
 }
 
 async function handleStrictIntervention(payload: StrictInterventionPayload) {
-  const settings = await ensureSettings();
-  const snoozeMinutes = Math.max(
-    1,
-    settings?.reminder.snoozeMinutes ?? p.settings.reminder.snoozeMinutes,
-  );
-  const showGif = settings?.reminder.showGifs ?? p.settings.reminder.showGifs;
+  const snoozeMinutes = payload.snoozeMinutes;
+  const showGif = payload.showGif;
 
   await ui.showStrict(payload, {
     snoozeMinutes,

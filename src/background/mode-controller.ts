@@ -13,6 +13,7 @@ import { initializeSiteDetector, matchUrl, subscribeToBlocklist } from "./site-d
 const GENTLE_REMINDER_PREFIX = "focusping::gentle-reminder::";
 const SNOOZE_ALARM_PREFIX = "focusping::snooze-expire::";
 const MS_PER_MINUTE = 60_000;
+const FALLBACK_SNOOZE_MINUTES = 5;
 
 type ScriptingApi = {
   executeScript?: (opts: { target: { tabId: number }; files: string[] }) => Promise<unknown>;
@@ -213,14 +214,17 @@ async function sendGentleIntervention(
   domain: string,
   pattern: string | null,
   url: string,
-  frequencyMinutes: number,
 ) {
+  await ensureSettingsLoaded();
+  const activeSettings = settings;
+  
   const payload = {
     domain,
     pattern,
     url,
     triggeredAtIso: new Date().toISOString(),
-    repeatAfterMinutes: frequencyMinutes,
+    snoozeMinutes: activeSettings?.reminder.snoozeMinutes ?? 10,
+    showGif: activeSettings?.reminder.showGifs ?? true,
   };
 
   try {
@@ -273,11 +277,16 @@ async function sendStrictIntervention(
   pattern: string | null,
   url: string,
 ) {
+  await ensureSettingsLoaded();
+  const activeSettings = settings;
+  
   const payload = {
     domain,
     pattern,
     url,
     triggeredAtIso: new Date().toISOString(),
+    snoozeMinutes: activeSettings?.reminder.snoozeMinutes ?? 10,
+    showGif: activeSettings?.reminder.showGifs ?? true,
   };
 
   try {
@@ -683,7 +692,7 @@ async function handleSnoozeCommand(payload: SnoozeCommandPayload | undefined) {
     return;
   }
 
-  const minutes = Math.max(1, payload?.minutes ?? activeSettings.reminder.snoozeMinutes ?? 10);
+  const minutes = payload?.minutes ?? FALLBACK_SNOOZE_MINUTES;
   const expiresAt = Date.now() + minutes * MS_PER_MINUTE;
 
   await mutateSessionState((session) => ({
@@ -813,13 +822,11 @@ async function handleGentleAlarmFired(domain: string) {
 
   // Send the notification
   const frequencyMinutes = Math.max(0.08, activeSettings.reminder.frequencyMinutes || 5);
-  const frequencyMs = frequencyMinutes * MS_PER_MINUTE;
 
   console.log("📤 [ALARM] Sending notification to tab", tab.id);
-  await sendGentleIntervention(tab.id, domain, match.pattern, url!, frequencyMinutes);
+  await sendGentleIntervention(tab.id, domain, match.pattern, url!);
 
-  // Schedule the next reminder
-  await scheduleGentleReminder(domain, now + frequencyMs);
+  // Don't schedule the next reminder - wait for user to dismiss or snooze
   await updateSessionGentleState(domain, frequencyMinutes, now);
 
   currentIntervention = {
@@ -829,7 +836,6 @@ async function handleGentleAlarmFired(domain: string) {
     tabId: tab.id,
     url: url!,
     triggeredAt: now,
-    reminderDueAt: now + frequencyMs,
   };
 }
 
@@ -983,7 +989,6 @@ function registerListeners() {
             iv.domain,
             iv.pattern,
             iv.url,
-            Math.max(1, settings?.reminder.frequencyMinutes ?? 5),
           );
         } else {
           await sendStrictIntervention(iv.tabId, iv.domain, iv.pattern, iv.url);
@@ -1002,9 +1007,6 @@ async function handleDebugTrigger(
 
   // handling debug trigger
 
-  await ensureSettingsLoaded();
-  const activeSettings = settings;
-
   const tab = await tabs.getActive();
   if (!tab || typeof tab.id !== "number") {
     return { ok: false, reason: "no-active-tab" };
@@ -1021,8 +1023,7 @@ async function handleDebugTrigger(
     await sendStrictIntervention(tab.id, domain, pattern, url);
     return { ok: true };
   } else {
-    const frequencyMinutes = Math.max(1, activeSettings?.reminder.frequencyMinutes ?? 5);
-    await sendGentleIntervention(tab.id, domain, pattern, url, frequencyMinutes);
+    await sendGentleIntervention(tab.id, domain, pattern, url);
     return { ok: true };
   }
 }

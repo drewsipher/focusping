@@ -3,6 +3,8 @@ export interface GentleInterventionPayload {
   pattern: string | null;
   url: string;
   triggeredAtIso: string;
+  snoozeMinutes: number;
+  showGif: boolean;
 }
 
 export interface StrictInterventionPayload {
@@ -10,6 +12,8 @@ export interface StrictInterventionPayload {
   pattern: string | null;
   url: string;
   triggeredAtIso: string;
+  snoozeMinutes: number;
+  showGif: boolean;
 }
 
 interface GentleOptions {
@@ -126,19 +130,6 @@ const UI_STYLE = /* css */ `
   .fp-button--ghost {
     background: rgba(15, 23, 42, 0.12);
     color: #0f172a;
-  }
-
-  .fp-toast__countdown {
-    font-family: "JetBrains Mono", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono",
-      "Courier New", monospace;
-    font-size: 0.85rem;
-    padding: 6px 12px;
-    border-radius: 999px;
-    background: rgba(15, 23, 42, 0.12);
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    width: fit-content;
   }
 
   .fp-toast__visual {
@@ -267,11 +258,6 @@ const UI_STYLE = /* css */ `
       color: rgba(241, 245, 249, 0.75);
     }
 
-    .fp-toast__countdown {
-      background: rgba(15, 23, 42, 0.45);
-      color: #f8fafc;
-    }
-
     .fp-button--ghost {
       background: rgba(15, 23, 42, 0.35);
       color: #f8fafc;
@@ -327,21 +313,8 @@ function pickRandom<T>(items: readonly T[]): T {
   return items[Math.floor(Math.random() * items.length) % items.length];
 }
 
-function formatCountdown(remainingMs: number) {
-  if (remainingMs <= 0) {
-    return "due any moment";
-  }
-  const totalSeconds = Math.ceil(remainingMs / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-}
-
 class GentleToast {
   private container: HTMLElement | null = null;
-  private countdownEl: HTMLSpanElement | null = null;
-  private countdownTimer: number | null = null;
-  private dueAt: number | null = null;
   private messageEl: HTMLParagraphElement | null = null;
   private headlineEl: HTMLHeadingElement | null = null;
   private emojiEl: HTMLDivElement | null = null;
@@ -419,10 +392,6 @@ class GentleToast {
 
   hide() {
     console.log("👋 [UI] GentleToast.hide() called");
-    if (this.countdownTimer) {
-      window.clearInterval(this.countdownTimer);
-      this.countdownTimer = null;
-    }
 
     this.container?.parentElement?.remove();
     this.container = null;

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "FocusPing",
   "description": "Stay focused by catching distracting tabs and nudging you back to work.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "action": {
     "default_title": "FocusPing",
     "default_popup": "src/ui/popup.html"

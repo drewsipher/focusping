@@ -51,8 +51,8 @@ const DEFAULT_SETTINGS: Settings = {
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   },
   reminder: {
-    frequencyMinutes: 5,
-    snoozeMinutes: 10,
+    frequencyMinutes: 2,
+    snoozeMinutes: 5,
     showGifs: true,
   },
   blocklist: DEFAULT_DISTRACTION_DOMAINS,
