@@ -5,7 +5,7 @@ import {
   subscribeToFocusState,
   type FocusState,
 } from "./scheduler";
-import { initializeSiteDetector, subscribeToBlocklist, type BlocklistState } from "./site-detector";
+import { initializeSiteDetector, isDistractingUrl, subscribeToBlocklist, type BlocklistState } from "./site-detector";
 import { initializeModeController } from "./mode-controller";
 
 const EXTENSION_NAME = "FocusPing";
@@ -19,9 +19,21 @@ const BADGE_LOOKUP: Record<FocusState["status"], { text: string; color: string }
 };
 
 async function applyBadgeState(state: FocusState) {
-  const { text, color } = BADGE_LOOKUP[state.status];
   try {
-    if (state.isMonitoring) {
+    // If not monitoring at all, clear badge
+    if (!state.isMonitoring) {
+      await action.setBadgeText("");
+      return;
+    }
+
+    // Check if current tab is on a watched site
+    const currentTab = await tabs.getActive();
+    const currentUrl = currentTab?.url ?? currentTab?.pendingUrl;
+    const isOnWatchedSite = currentUrl ? isDistractingUrl(currentUrl) : false;
+
+    // Only show badge if on a watched site
+    if (isOnWatchedSite) {
+      const { text, color } = BADGE_LOOKUP[state.status];
       await action.setBadgeText(text);
       await action.setBadgeBackgroundColor({ color });
     } else {
@@ -92,6 +104,24 @@ initializeScheduler()
   });
 
 subscribeToFocusState(handleFocusState);
+
+// Update badge when user switches tabs or updates a tab
+chrome.tabs.onActivated.addListener(() => {
+  const state = getCurrentFocusState();
+  if (state) {
+    void applyBadgeState(state);
+  }
+});
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  // Only update badge when URL changes and it's the active tab
+  if (changeInfo.url && tab.active) {
+    const state = getCurrentFocusState();
+    if (state) {
+      void applyBadgeState(state);
+    }
+  }
+});
 
 chrome.runtime.onInstalled.addListener(() => {
   console.info(`${EXTENSION_NAME} installed`);
