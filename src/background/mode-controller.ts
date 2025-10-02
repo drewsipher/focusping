@@ -223,7 +223,7 @@ async function sendGentleIntervention(
     pattern,
     url,
     triggeredAtIso: new Date().toISOString(),
-    snoozeMinutes: activeSettings?.reminder.snoozeMinutes ?? 10,
+    reminderMinutes: activeSettings?.reminder.frequencyMinutes ?? 2,
     showGif: activeSettings?.reminder.showGifs ?? true,
   };
 
@@ -285,7 +285,7 @@ async function sendStrictIntervention(
     pattern,
     url,
     triggeredAtIso: new Date().toISOString(),
-    snoozeMinutes: activeSettings?.reminder.snoozeMinutes ?? 10,
+    reminderMinutes: activeSettings?.reminder.frequencyMinutes ?? 2,
     showGif: activeSettings?.reminder.showGifs ?? true,
   };
 
@@ -693,6 +693,15 @@ async function handleSnoozeCommand(payload: SnoozeCommandPayload | undefined) {
   }
 
   const minutes = payload?.minutes ?? FALLBACK_SNOOZE_MINUTES;
+  
+  // If minutes is 0, just dismiss without snoozing or re-evaluating
+  if (minutes === 0) {
+    await clearCurrentIntervention("dismissed-no-snooze");
+    // Don't call requestEvaluation here - user explicitly dismissed,
+    // so don't immediately show another intervention
+    return;
+  }
+
   const expiresAt = Date.now() + minutes * MS_PER_MINUTE;
 
   await mutateSessionState((session) => ({

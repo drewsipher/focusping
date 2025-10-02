@@ -3,7 +3,7 @@ export interface GentleInterventionPayload {
   pattern: string | null;
   url: string;
   triggeredAtIso: string;
-  snoozeMinutes: number;
+  reminderMinutes: number;
   showGif: boolean;
 }
 
@@ -12,19 +12,19 @@ export interface StrictInterventionPayload {
   pattern: string | null;
   url: string;
   triggeredAtIso: string;
-  snoozeMinutes: number;
+  reminderMinutes: number;
   showGif: boolean;
 }
 
 interface GentleOptions {
-  snoozeMinutes: number;
+  reminderMinutes: number;
   showGif: boolean;
   onDismiss: () => Promise<void>;
   onSnooze?: () => Promise<void>;
 }
 
 interface StrictOptions {
-  snoozeMinutes: number;
+  reminderMinutes: number;
   showGif: boolean;
   onSnooze: () => Promise<void>;
   onOpenNewTab?: () => Promise<void>;
@@ -362,15 +362,15 @@ class GentleToast {
     actions.className = "fp-toast__actions";
 
     const dismiss = document.createElement("button");
-    dismiss.className = "fp-button fp-button--primary";
+    dismiss.className = "fp-button fp-button--ghost";
     dismiss.type = "button";
     dismiss.textContent = "Dismiss";
 
     const snooze = document.createElement("button");
-    snooze.className = "fp-button fp-button--ghost";
+    snooze.className = "fp-button fp-button--primary";
     snooze.type = "button";
 
-    actions.append(dismiss, snooze);
+    actions.append(snooze, dismiss);
     toast.append(header, headline, message, visual, actions);
     banner.appendChild(toast);
     container.appendChild(banner);
@@ -441,24 +441,24 @@ class GentleToast {
     this.headlineEl.textContent = headline;
     this.messageEl.innerHTML = playful;
 
-    if (this.dismissButton) {
-      this.dismissButton.onclick = async () => {
-        this.dismissButton!.disabled = true;
-        try {
-          await options.onDismiss();
-          this.hide();
-        } catch (error) {
-          console.error("Failed to dismiss gentle reminder", error);
-        } finally {
-          this.dismissButton && (this.dismissButton.disabled = false);
-        }
-      };
+    // Format reminder time as "X min Y sec"
+    const totalSeconds = Math.round(options.reminderMinutes * 60);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    let timeText = "";
+    if (minutes > 0 && seconds > 0) {
+      timeText = `${minutes} min ${seconds} sec`;
+    } else if (minutes > 0) {
+      timeText = `${minutes} min`;
+    } else {
+      timeText = `${seconds} sec`;
     }
 
+    // Snooze button now restarts the timer (old dismiss behavior)
     if (this.snoozeButton) {
       if (options.onSnooze) {
         this.snoozeButton.hidden = false;
-        this.snoozeButton.textContent = `Snooze ${options.snoozeMinutes} min`;
+        this.snoozeButton.textContent = `Snooze for ${timeText}`;
         this.snoozeButton.onclick = async () => {
           this.snoozeButton!.disabled = true;
           try {
@@ -473,6 +473,21 @@ class GentleToast {
       } else {
         this.snoozeButton.hidden = true;
       }
+    }
+
+    // Dismiss button now just closes the toast (old snooze behavior)
+    if (this.dismissButton) {
+      this.dismissButton.onclick = async () => {
+        this.dismissButton!.disabled = true;
+        try {
+          await options.onDismiss();
+          this.hide();
+        } catch (error) {
+          console.error("Failed to dismiss gentle reminder", error);
+        } finally {
+          this.dismissButton && (this.dismissButton.disabled = false);
+        }
+      };
     }
   }
 }
@@ -562,10 +577,24 @@ class StrictOverlay {
 
     this.headlineEl.textContent = `Focus rescue on ${payload.domain}`;
     this.messageEl.textContent = pickRandom(STRICT_MESSAGES);
+    
+    // Format reminder time as "X min Y sec"
+    const totalSeconds = Math.round(options.reminderMinutes * 60);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    let timeText = "";
+    if (minutes > 0 && seconds > 0) {
+      timeText = `${minutes} min ${seconds} sec`;
+    } else if (minutes > 0) {
+      timeText = `${minutes} min`;
+    } else {
+      timeText = `${seconds} sec`;
+    }
+    
     this.noteEl.textContent = "Switch to a productive tab or snooze the blocker temporarily.";
 
     if (this.snoozeButton) {
-      this.snoozeButton.textContent = `Snooze ${options.snoozeMinutes} min`;
+      this.snoozeButton.textContent = `Snooze for ${timeText}`;
       this.snoozeButton.onclick = async () => {
         this.snoozeButton!.disabled = true;
         try {

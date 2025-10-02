@@ -14,7 +14,6 @@ type Elements = {
   scheduleEnd: HTMLInputElement | null;
   schedulePaused: HTMLInputElement | null;
   reminderFrequency: HTMLInputElement | null;
-  snoozeDuration: HTMLInputElement | null;
   gifToggle: HTMLInputElement | null;
   blocklistForm: HTMLFormElement | null;
   domainInput: HTMLInputElement | null;
@@ -33,7 +32,6 @@ function collectElements(): Elements {
     scheduleEnd: query<HTMLInputElement>("schedule-end"),
     schedulePaused: query<HTMLInputElement>("schedule-paused"),
     reminderFrequency: query<HTMLInputElement>("reminder-frequency"),
-    snoozeDuration: query<HTMLInputElement>("snooze-duration"),
     gifToggle: query<HTMLInputElement>("gif-toggle"),
     blocklistForm: query<HTMLFormElement>("blocklist-form"),
     domainInput: query<HTMLInputElement>("domain-input"),
@@ -177,10 +175,6 @@ function renderSettings(settings: Settings) {
     elements.reminderFrequency.value = String(settings.reminder.frequencyMinutes);
   }
 
-  if (elements.snoozeDuration) {
-    elements.snoozeDuration.value = String(settings.reminder.snoozeMinutes);
-  }
-
   if (elements.gifToggle) {
     elements.gifToggle.checked = Boolean(settings.reminder.showGifs);
   }
@@ -294,19 +288,6 @@ function handleReminderFrequencyChange() {
     reminder: {
       ...settings.reminder,
       frequencyMinutes: minutes,
-    },
-  }));
-}
-
-function handleSnoozeDurationChange() {
-  const fallback =
-    currentSettings?.reminder.snoozeMinutes ?? defaults.settings.reminder.snoozeMinutes;
-  const minutes = readMinutes(elements.snoozeDuration, fallback);
-  void applyUpdate((settings) => ({
-    ...settings,
-    reminder: {
-      ...settings.reminder,
-      snoozeMinutes: minutes,
     },
   }));
 }
@@ -433,9 +414,6 @@ async function bootstrap() {
   elements.reminderFrequency?.addEventListener("change", handleReminderFrequencyChange);
   elements.reminderFrequency?.addEventListener("blur", handleReminderFrequencyChange);
   elements.reminderFrequency?.addEventListener("input", handleReminderFrequencyChange);
-  elements.snoozeDuration?.addEventListener("change", handleSnoozeDurationChange);
-  elements.snoozeDuration?.addEventListener("blur", handleSnoozeDurationChange);
-  elements.snoozeDuration?.addEventListener("input", handleSnoozeDurationChange);
   elements.gifToggle?.addEventListener("change", handleGifToggleChange);
   elements.domainInput?.addEventListener("input", () => setDomainError(null));
   elements.blocklistForm?.addEventListener("submit", (event) => {

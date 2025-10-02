@@ -17,7 +17,6 @@ export interface ScheduleSettings {
 
 export interface ReminderSettings {
   frequencyMinutes: number;
-  snoozeMinutes: number;
   showGifs: boolean;
 }
 
@@ -52,7 +51,6 @@ const DEFAULT_SETTINGS: Settings = {
   },
   reminder: {
     frequencyMinutes: 2,
-    snoozeMinutes: 5,
     showGifs: true,
   },
   blocklist: DEFAULT_DISTRACTION_DOMAINS,

@@ -16,42 +16,44 @@ const runtime = {
 
 const ui = new FocusPingUi();
 
+// Dismiss now just closes the toast with no timer
 async function dismissGentle(domain: string) {
+  await runtime.sendMessage({
+    type: "focusping::command-snooze",
+    payload: { domain, minutes: 0 },
+  });
+}
+
+// Snooze now restarts the timer (old dismiss behavior)
+async function snoozeWithTimer(domain: string) {
   await runtime.sendMessage({
     type: "focusping::command-dismiss-gentle",
     payload: { domain },
   });
 }
 
-async function snoozeDomain(domain: string, minutes: number) {
-  await runtime.sendMessage({
-    type: "focusping::command-snooze",
-    payload: { domain, minutes },
-  });
-}
-
 async function handleGentleIntervention(payload: GentleInterventionPayload) {
   console.log("🎯 [CONTENT] handleGentleIntervention called", payload.domain);
-  const snoozeMinutes = payload.snoozeMinutes;
+  const reminderMinutes = payload.reminderMinutes;
   const showGif = payload.showGif;
 
   await ui.showGentle(payload, {
-    snoozeMinutes,
+    reminderMinutes,
     showGif,
     onDismiss: () => dismissGentle(payload.domain),
-    onSnooze: () => snoozeDomain(payload.domain, snoozeMinutes),
+    onSnooze: () => snoozeWithTimer(payload.domain),
   });
   console.log("✅ [CONTENT] handleGentleIntervention completed");
 }
 
 async function handleStrictIntervention(payload: StrictInterventionPayload) {
-  const snoozeMinutes = payload.snoozeMinutes;
+  const reminderMinutes = payload.reminderMinutes;
   const showGif = payload.showGif;
 
   await ui.showStrict(payload, {
-    snoozeMinutes,
+    reminderMinutes,
     showGif,
-    onSnooze: () => snoozeDomain(payload.domain, snoozeMinutes),
+    onSnooze: () => snoozeWithTimer(payload.domain),
   });
 }
 
