@@ -140,9 +140,11 @@ function resolveBlocklist(settings: Settings): { patterns: string[]; upgraded: b
       : DEFAULT_DISTRACTION_DOMAINS;
 
   const normalized = new Set<string>();
+  const disabled = new Set(settings.disabledBlocklist ?? []);
+  
   source.forEach((pattern) => {
     const compiled = normalizePattern(pattern);
-    if (compiled) {
+    if (compiled && !disabled.has(compiled)) {
       normalized.add(compiled);
     }
   });
@@ -150,7 +152,7 @@ function resolveBlocklist(settings: Settings): { patterns: string[]; upgraded: b
   if (!normalized.size) {
     DEFAULT_DISTRACTION_DOMAINS.forEach((pattern) => {
       const compiled = normalizePattern(pattern);
-      if (compiled) {
+      if (compiled && !disabled.has(compiled)) {
         normalized.add(compiled);
       }
     });
