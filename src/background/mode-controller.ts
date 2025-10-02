@@ -15,6 +15,11 @@ const SNOOZE_ALARM_PREFIX = "focusping::snooze-expire::";
 const MS_PER_MINUTE = 60_000;
 const FALLBACK_SNOOZE_MINUTES = 5;
 
+// Helper to get formatted timestamp for logs
+function timestamp() {
+  return new Date().toISOString();
+}
+
 type ScriptingApi = {
   executeScript?: (opts: { target: { tabId: number }; files: string[] }) => Promise<unknown>;
 };
@@ -82,7 +87,7 @@ async function scheduleGentleReminder(domain: string, dueAt: number) {
   await alarms.clear(alarmName);
   await alarms.create(alarmName, { when: dueAt });
   const delay = dueAt - Date.now();
-  console.log("⏰ [ALARM] Scheduled gentle reminder", {
+  console.log(`⏰ [ALARM] [${timestamp()}] Scheduled gentle reminder`, {
     domain,
     alarmName,
     dueAt: new Date(dueAt).toISOString(),
@@ -92,7 +97,7 @@ async function scheduleGentleReminder(domain: string, dueAt: number) {
   // Verify alarm was created
   const allAlarms = await alarms.getAll();
   console.log(
-    "⏰ [ALARM] All alarms after scheduling:",
+    `⏰ [ALARM] [${timestamp()}] All alarms after scheduling:`,
     allAlarms.map((a) => ({
       name: a.name,
       scheduledTime: new Date(a.scheduledTime).toISOString(),
@@ -506,7 +511,7 @@ async function handleGentleIntervention(
   const existingAlarm = await alarms.get(alarmName);
   if (existingAlarm && typeof tab.id === "number") {
     console.log(
-      "⏰ [SKIP] Alarm already scheduled for",
+      `⏰ [SKIP] [${timestamp()}] Alarm already scheduled for`,
       domain,
       "at",
       new Date(existingAlarm.scheduledTime).toISOString(),
@@ -539,7 +544,7 @@ async function handleGentleIntervention(
   }
 
   // Don't send notification immediately - just schedule the alarm
-  console.log("⏰ [TIMER START] Starting timer for", domain, "without immediate notification");
+  console.log(`⏰ [TIMER START] [${timestamp()}] Starting timer for`, domain, "without immediate notification");
 
   // Schedule the first reminder
   await scheduleGentleReminder(domain, now + frequencyMs);
@@ -562,19 +567,67 @@ async function handleStrictIntervention(
   pattern: string | null,
   url: string,
 ) {
-  if (typeof tab.id !== "number") {
+  if (!settings) {
     return;
   }
 
+  // Use the same frequency timer as gentle mode
+  const frequencyMinutes = Math.max(0.08, settings.reminder.frequencyMinutes || 5);
+  const now = Date.now();
+  const frequencyMs = frequencyMinutes * MS_PER_MINUTE;
+
+  console.debug("[Mode Controller] handleStrictIntervention", {
+    domain,
+    frequencyMinutes,
+    hasCurrentIntervention: !!currentIntervention,
+    currentDomain: currentIntervention?.domain,
+    currentTabId: currentIntervention?.tabId,
+    newTabId: tab.id,
+  });
+
+  // Check if there's already an alarm scheduled for this domain
+  const alarmName = gentleAlarmName(domain);
+  const existingAlarm = await alarms.get(alarmName);
+  if (existingAlarm && typeof tab.id === "number") {
+    console.log(
+      `⏰ [SKIP] [${timestamp()}] Alarm already scheduled for`,
+      domain,
+      "at",
+      new Date(existingAlarm.scheduledTime).toISOString(),
+    );
+    // Update current intervention to track this tab
+    currentIntervention = {
+      kind: "strict",
+      domain,
+      pattern,
+      tabId: tab.id,
+      url,
+      triggeredAt: Date.now(),
+      reminderDueAt: existingAlarm.scheduledTime,
+    };
+    return;
+  }
+
+  // If we already have an intervention for this domain and tab, don't create another
   if (
     currentIntervention?.kind === "strict" &&
     currentIntervention.domain === domain &&
     currentIntervention.tabId === tab.id
   ) {
+    console.debug("[Mode Controller] Intervention already exists, skipping");
     return;
   }
 
-  await sendStrictIntervention(tab.id, domain, pattern, url);
+  if (typeof tab.id !== "number") {
+    return;
+  }
+
+  // Don't send notification immediately - just schedule the alarm (same as gentle mode)
+  console.log(`⏰ [TIMER START] [${timestamp()}] Starting timer for`, domain, "without immediate notification");
+
+  // Schedule the first reminder
+  await scheduleGentleReminder(domain, now + frequencyMs);
+  await updateSessionGentleState(domain, frequencyMinutes, now);
 
   currentIntervention = {
     kind: "strict",
@@ -582,10 +635,9 @@ async function handleStrictIntervention(
     pattern,
     tabId: tab.id,
     url,
-    triggeredAt: Date.now(),
+    triggeredAt: now,
+    reminderDueAt: now + frequencyMs,
   };
-
-  await clearSessionReminderState();
 }
 
 async function evaluate(reason: string) {
@@ -694,8 +746,15 @@ async function handleSnoozeCommand(payload: SnoozeCommandPayload | undefined) {
 
   const minutes = payload?.minutes ?? FALLBACK_SNOOZE_MINUTES;
   
+  console.log(`💤 [SNOOZE] [${timestamp()}] Snooze command received`, {
+    domain: targetDomain,
+    minutes,
+    currentInterventionKind: currentIntervention?.kind,
+  });
+  
   // If minutes is 0, just dismiss without snoozing or re-evaluating
   if (minutes === 0) {
+    console.log(`👋 [DISMISS] [${timestamp()}] Dismissing without snooze (0 minutes)`);
     await clearCurrentIntervention("dismissed-no-snooze");
     // Don't call requestEvaluation here - user explicitly dismissed,
     // so don't immediately show another intervention
@@ -703,6 +762,12 @@ async function handleSnoozeCommand(payload: SnoozeCommandPayload | undefined) {
   }
 
   const expiresAt = Date.now() + minutes * MS_PER_MINUTE;
+
+  console.log(`💤 [SNOOZE] [${timestamp()}] Snoozing domain`, {
+    domain: targetDomain,
+    expiresAt: new Date(expiresAt).toISOString(),
+    durationMinutes: minutes,
+  });
 
   await mutateSessionState((session) => ({
     ...session,
@@ -719,7 +784,7 @@ async function handleSnoozeCommand(payload: SnoozeCommandPayload | undefined) {
 }
 
 async function handleDismissGentleCommand(payload: DismissCommandPayload | undefined) {
-  console.log("👋 [DISMISS] Handling dismiss command", payload);
+  console.log(`👋 [DISMISS] [${timestamp()}] Handling dismiss command`, payload);
   const targetDomain = payload?.domain ?? currentIntervention?.domain;
   if (!targetDomain) {
     return;
@@ -735,6 +800,11 @@ async function handleDismissGentleCommand(payload: DismissCommandPayload | undef
   const frequencyMinutes = Math.max(0.08, activeSettings.reminder.frequencyMinutes || 5);
   const frequencyMs = frequencyMinutes * MS_PER_MINUTE;
 
+  console.log(`⏰ [DISMISS] [${timestamp()}] Restarting timer for`, targetDomain, {
+    frequencyMinutes,
+    nextAlarmAt: new Date(now + frequencyMs).toISOString(),
+  });
+
   await mutateSessionState((session) => ({
     ...session,
     lastGentleReminderAt: {
@@ -747,6 +817,11 @@ async function handleDismissGentleCommand(payload: DismissCommandPayload | undef
   if (currentIntervention?.kind === "gentle" && currentIntervention.domain === targetDomain) {
     await clearGentleReminder(targetDomain);
     await clearCurrentIntervention("gentle-dismissed");
+  }
+
+  if (currentIntervention?.kind === "strict" && currentIntervention.domain === targetDomain) {
+    await clearGentleReminder(targetDomain);
+    await clearCurrentIntervention("strict-dismissed");
   }
 
   // Schedule next reminder without showing notification immediately
@@ -783,7 +858,7 @@ async function handleFrequencyChanged(payload: { frequencyMinutes: number } | un
 }
 
 async function handleGentleAlarmFired(domain: string) {
-  console.log("🔔 [ALARM] Processing gentle alarm for domain:", domain);
+  console.log(`🔔 [ALARM] [${timestamp()}] Processing alarm for domain:`, domain);
 
   await ensureSettingsLoaded();
   await ensureFocusState();
@@ -791,7 +866,7 @@ async function handleGentleAlarmFired(domain: string) {
   const state = focusState;
 
   if (!state || !activeSettings || !state.isMonitoring || state.status !== "active") {
-    console.log("⏭️ [ALARM] Skipping - not in active focus period");
+    console.log(`⏭️ [ALARM] [${timestamp()}] Skipping - not in active focus period`);
     currentIntervention = null;
     return;
   }
@@ -799,21 +874,21 @@ async function handleGentleAlarmFired(domain: string) {
   // Check if user is still on this domain
   const tab = await tabs.getActive();
   if (!tab || typeof tab.id !== "number") {
-    console.log("⏭️ [ALARM] Skipping - no active tab");
+    console.log(`⏭️ [ALARM] [${timestamp()}] Skipping - no active tab`);
     currentIntervention = null;
     return;
   }
 
   const url = tab.url ?? tab.pendingUrl;
   if (!isUrlMatchable(url)) {
-    console.log("⏭️ [ALARM] Skipping - URL not matchable");
+    console.log(`⏭️ [ALARM] [${timestamp()}] Skipping - URL not matchable`);
     currentIntervention = null;
     return;
   }
 
   const match = matchUrl(url!);
   if (!match.matched || match.host !== domain) {
-    console.log("⏭️ [ALARM] Skipping - user switched away from", domain);
+    console.log(`⏭️ [ALARM] [${timestamp()}] Skipping - user switched away from`, domain);
     currentIntervention = null;
     return;
   }
@@ -824,7 +899,7 @@ async function handleGentleAlarmFired(domain: string) {
   session = pruneExpiredSnoozes(session, now);
 
   if (await isDomainSnoozed(domain, session, now)) {
-    console.log("⏭️ [ALARM] Skipping - domain is snoozed");
+    console.log(`⏭️ [ALARM] [${timestamp()}] Skipping - domain is snoozed`);
     currentIntervention = null;
     return;
   }
@@ -832,14 +907,25 @@ async function handleGentleAlarmFired(domain: string) {
   // Send the notification
   const frequencyMinutes = Math.max(0.08, activeSettings.reminder.frequencyMinutes || 5);
 
-  console.log("📤 [ALARM] Sending notification to tab", tab.id);
-  await sendGentleIntervention(tab.id, domain, match.pattern, url!);
+  console.log(
+    `📤 [ALARM] [${timestamp()}] Sending notification to tab`,
+    tab.id,
+    "mode:",
+    activeSettings.mode,
+  );
+  
+  // Send appropriate intervention based on current mode
+  if (activeSettings.mode === "strict") {
+    await sendStrictIntervention(tab.id, domain, match.pattern, url!);
+  } else {
+    await sendGentleIntervention(tab.id, domain, match.pattern, url!);
+  }
 
   // Don't schedule the next reminder - wait for user to dismiss or snooze
   await updateSessionGentleState(domain, frequencyMinutes, now);
 
   currentIntervention = {
-    kind: "gentle",
+    kind: activeSettings.mode,
     domain,
     pattern: match.pattern,
     tabId: tab.id,
@@ -898,14 +984,14 @@ function registerListeners() {
 
   chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name.startsWith(GENTLE_REMINDER_PREFIX)) {
-      console.log("🔔 [ALARM FIRED] Gentle reminder alarm:", alarm.name);
+      console.log(`🔔 [${timestamp()}] [ALARM FIRED] Gentle reminder alarm:`, alarm.name);
       // Extract domain from alarm name
       const domain = alarm.name.replace(GENTLE_REMINDER_PREFIX, "");
       void handleGentleAlarmFired(domain);
       return;
     }
     if (alarm.name.startsWith(SNOOZE_ALARM_PREFIX)) {
-      console.log("🔔 [ALARM FIRED] Snooze alarm:", alarm.name);
+      console.log(`🔔 [${timestamp()}] [ALARM FIRED] Snooze alarm:`, alarm.name);
       requestEvaluation("snooze-expired");
     }
   });
