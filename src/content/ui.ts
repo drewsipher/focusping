@@ -274,7 +274,7 @@ const UI_STYLE = /* css */ `
   }
 `;
 
-const GENTLE_HEADLINES = [
+const HEADLINES = [
   "Hey look over here!",
   "Time to refocus!",
   "Your attention, please!",
@@ -287,7 +287,7 @@ const GENTLE_HEADLINES = [
   "Focus up!",
 ];
 
-const GENTLE_MESSAGES = [
+const MESSAGES = [
   "Your deadlines did not sign up for this. Come back to the flow!",
   "Stop doomscrolling, start doing.",
   "Your goals just called — it wants your attention back.",
@@ -298,13 +298,6 @@ const GENTLE_MESSAGES = [
   "Funny how time flies when you're procrastinating.",
   "Oh look, a squirrel! Just kidding, focus up!",
   "Only you can prevent productivity fires.",
-];
-
-const STRICT_MESSAGES = [
-  "This page is a distraction trap—escape while you can!",
-  "Strict mode engaged: rescue your focus hero.",
-  "Your goals called. They're waiting on another tab.",
-  "Nothing changes if nothing changes. Let's pivot!",
 ];
 
 const FRIENDLY_EMOJIS = ["🚀", "🧠", "🎧", "✨", "🛡️", "🔥"];
@@ -436,8 +429,8 @@ class GentleToast {
       this.emojiEl.toggleAttribute("hidden", !options.showGif);
     }
 
-    const playful = pickRandom(GENTLE_MESSAGES);
-    const headline = pickRandom(GENTLE_HEADLINES);
+    const playful = pickRandom(MESSAGES);
+    const headline = pickRandom(HEADLINES);
     this.headlineEl.textContent = headline;
     this.messageEl.innerHTML = playful;
 
@@ -575,8 +568,8 @@ class StrictOverlay {
       this.emojiEl.toggleAttribute("hidden", !options.showGif);
     }
 
-    this.headlineEl.textContent = `Focus rescue on ${payload.domain}`;
-    this.messageEl.textContent = pickRandom(STRICT_MESSAGES);
+    this.headlineEl.textContent = pickRandom(HEADLINES);
+    this.messageEl.textContent = pickRandom(MESSAGES);
     
     // Format reminder time as "X min Y sec"
     const totalSeconds = Math.round(options.reminderMinutes * 60);
