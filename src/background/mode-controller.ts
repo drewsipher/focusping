@@ -1151,7 +1151,26 @@ export async function initializeModeController() {
       requestEvaluation("blocklist-update");
     });
 
-    onSettingsChanged((next) => {
+    onSettingsChanged(async (next) => {
+      const previousMode = settings?.mode;
+      const modeChanged = previousMode && next.mode !== previousMode;
+      
+      if (modeChanged) {
+        console.log(`🔄 [MODE CHANGE] [${timestamp()}] Mode changed from ${previousMode} to ${next.mode}`);
+        
+        // Clear any current intervention (overlay/toast)
+        await clearCurrentIntervention("mode-changed");
+        
+        // Clear all gentle reminder alarms to reset timers
+        const allAlarms = await chrome.alarms.getAll();
+        for (const alarm of allAlarms) {
+          if (alarm.name.startsWith(GENTLE_REMINDER_PREFIX)) {
+            await chrome.alarms.clear(alarm.name);
+            console.log(`🔄 [MODE CHANGE] [${timestamp()}] Cleared alarm:`, alarm.name);
+          }
+        }
+      }
+      
       settings = next;
       requestEvaluation("settings-changed");
     });
