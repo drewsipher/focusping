@@ -381,9 +381,6 @@ class GentleToast {
     const message = document.createElement("p");
     message.className = "fp-text-subtle";
 
-    const countdown = document.createElement("span");
-    countdown.className = "fp-toast__countdown";
-
     const visual = document.createElement("div");
     visual.className = "fp-toast__visual";
     visual.setAttribute("aria-hidden", "true");
@@ -401,7 +398,7 @@ class GentleToast {
     snooze.type = "button";
 
     actions.append(dismiss, snooze);
-    toast.append(header, headline, message, countdown, visual, actions);
+    toast.append(header, headline, message, visual, actions);
     banner.appendChild(toast);
     container.appendChild(banner);
 
@@ -413,7 +410,6 @@ class GentleToast {
     });
 
     this.container = toast;
-    this.countdownEl = countdown;
     this.messageEl = message;
     this.headlineEl = headline;
     this.emojiEl = visual;
@@ -430,7 +426,6 @@ class GentleToast {
 
     this.container?.parentElement?.remove();
     this.container = null;
-    this.countdownEl = null;
     this.messageEl = null;
     this.headlineEl = null;
     this.emojiEl = null;
@@ -447,7 +442,7 @@ class GentleToast {
     });
 
     this.ensureContainer(container);
-    if (!this.container || !this.countdownEl || !this.messageEl || !this.headlineEl) {
+    if (!this.container || !this.messageEl || !this.headlineEl) {
       console.log("❌ [UI] Missing container elements, cannot show toast");
       return;
     }
@@ -476,7 +471,6 @@ class GentleToast {
     const headline = pickRandom(GENTLE_HEADLINES);
     this.headlineEl.textContent = headline;
     this.messageEl.innerHTML = playful;
-    this.countdownEl.textContent = `Next reminder `;
 
     if (this.dismissButton) {
       this.dismissButton.onclick = async () => {
