@@ -87,13 +87,16 @@ async function scheduleGentleReminder(domain: string, dueAt: number) {
     dueAt: new Date(dueAt).toISOString(),
     delaySeconds: Math.round(delay / 1000),
   });
-  
+
   // Verify alarm was created
   const allAlarms = await alarms.getAll();
-  console.log("⏰ [ALARM] All alarms after scheduling:", allAlarms.map(a => ({
-    name: a.name,
-    scheduledTime: new Date(a.scheduledTime).toISOString(),
-  })));
+  console.log(
+    "⏰ [ALARM] All alarms after scheduling:",
+    allAlarms.map((a) => ({
+      name: a.name,
+      scheduledTime: new Date(a.scheduledTime).toISOString(),
+    })),
+  );
 }
 
 async function clearGentleReminder(domain: string | null) {
@@ -231,14 +234,11 @@ async function sendGentleIntervention(
     // If the receiving end does not exist, try injecting the content script once
     // and retry the message.
     const needInjection =
-      error instanceof Error && 
-      (/Receiving end does not exist/.test(error.message) || 
-       /message port closed/.test(error.message));
+      error instanceof Error &&
+      (/Receiving end does not exist/.test(error.message) ||
+        /message port closed/.test(error.message));
     if (needInjection) {
-      console.log(
-        "💉 [INJECT] Attempting content script injection and retry for tab",
-        tabId,
-      );
+      console.log("💉 [INJECT] Attempting content script injection and retry for tab", tabId);
       const injected = await injectContentScriptToTab(tabId);
       console.log("💉 [INJECT] Injection result:", injected);
       try {
@@ -332,14 +332,11 @@ async function sendClearIntervention(tabId: number, reason: string) {
     console.debug("[Mode Controller] tabs.sendMessage succeeded for clear", tabId);
   } catch (error) {
     const needInjection =
-      error instanceof Error && 
-      (/Receiving end does not exist/.test(error.message) || 
-       /message port closed/.test(error.message));
+      error instanceof Error &&
+      (/Receiving end does not exist/.test(error.message) ||
+        /message port closed/.test(error.message));
     if (needInjection) {
-      console.log(
-        "💉 [INJECT] Attempting content script injection and retry for clear",
-        tabId,
-      );
+      console.log("💉 [INJECT] Attempting content script injection and retry for clear", tabId);
       const injected = await injectContentScriptToTab(tabId);
       console.log("💉 [INJECT] Clear injection result:", injected);
       try {
@@ -499,7 +496,12 @@ async function handleGentleIntervention(
   const alarmName = gentleAlarmName(domain);
   const existingAlarm = await alarms.get(alarmName);
   if (existingAlarm && typeof tab.id === "number") {
-    console.log("⏰ [SKIP] Alarm already scheduled for", domain, "at", new Date(existingAlarm.scheduledTime).toISOString());
+    console.log(
+      "⏰ [SKIP] Alarm already scheduled for",
+      domain,
+      "at",
+      new Date(existingAlarm.scheduledTime).toISOString(),
+    );
     // Update current intervention to track this tab
     currentIntervention = {
       kind: "gentle",
@@ -609,7 +611,7 @@ async function evaluate(reason: string) {
 
   const url = tab.url ?? tab.pendingUrl;
   console.debug("Mode controller: checking tab", { tabId: tab.id, url });
-  
+
   if (!isUrlMatchable(url)) {
     console.debug("Mode controller: URL not matchable");
     await clearCurrentIntervention("unsupported-url");
@@ -618,7 +620,7 @@ async function evaluate(reason: string) {
 
   const match = matchUrl(url!);
   console.debug("Mode controller: match result", { matched: match.matched, host: match.host });
-  
+
   if (!match.matched || !match.host) {
     console.debug("Mode controller: no match for URL");
     await clearCurrentIntervention("no-match");
@@ -733,14 +735,14 @@ async function handleDismissGentleCommand(payload: DismissCommandPayload | undef
   console.log("⏰ [DISMISS] Scheduling next reminder without immediate notification");
   await scheduleGentleReminder(targetDomain, now + frequencyMs);
   await updateSessionGentleState(targetDomain, frequencyMinutes, now);
-  
+
   // Set currentIntervention to null so the next alarm will trigger a new one
   currentIntervention = null;
 }
 
 async function handleFrequencyChanged(payload: { frequencyMinutes: number } | undefined) {
   console.log("🔄 [FREQUENCY] Reminder frequency changed", payload);
-  
+
   if (!payload || typeof payload.frequencyMinutes !== "number") {
     return;
   }
@@ -764,7 +766,7 @@ async function handleFrequencyChanged(payload: { frequencyMinutes: number } | un
 
 async function handleGentleAlarmFired(domain: string) {
   console.log("🔔 [ALARM] Processing gentle alarm for domain:", domain);
-  
+
   await ensureSettingsLoaded();
   await ensureFocusState();
   const activeSettings = settings;
@@ -802,7 +804,7 @@ async function handleGentleAlarmFired(domain: string) {
   const now = Date.now();
   let session = await getSessionState();
   session = pruneExpiredSnoozes(session, now);
-  
+
   if (await isDomainSnoozed(domain, session, now)) {
     console.log("⏭️ [ALARM] Skipping - domain is snoozed");
     currentIntervention = null;
@@ -812,7 +814,7 @@ async function handleGentleAlarmFired(domain: string) {
   // Send the notification
   const frequencyMinutes = Math.max(0.08, activeSettings.reminder.frequencyMinutes || 5);
   const frequencyMs = frequencyMinutes * MS_PER_MINUTE;
-  
+
   console.log("📤 [ALARM] Sending notification to tab", tab.id);
   await sendGentleIntervention(tab.id, domain, match.pattern, url!, frequencyMinutes);
 

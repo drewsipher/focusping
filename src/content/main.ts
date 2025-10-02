@@ -91,7 +91,7 @@ async function handleStrictIntervention(payload: StrictInterventionPayload) {
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   console.log("📬 [CONTENT] Message received:", message?.type);
-  
+
   // received message
   if (!message?.type) {
     return;

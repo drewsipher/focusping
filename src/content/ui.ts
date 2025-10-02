@@ -427,7 +427,7 @@ class GentleToast {
       hasContainer: !!this.container,
       containerInDOM: this.container?.isConnected,
     });
-    
+
     this.ensureContainer(container);
     if (!this.container || !this.countdownEl || !this.messageEl || !this.headlineEl) {
       console.log("❌ [UI] Missing container elements, cannot show toast");
@@ -631,7 +631,9 @@ export class FocusPingUi {
 
   private ensureContainer(): Promise<HTMLDivElement> {
     if (this.host && this.host.isConnected) {
-      return Promise.resolve(this.host.shadowRoot!.querySelector("#focusping-root-inner") as HTMLDivElement);
+      return Promise.resolve(
+        this.host.shadowRoot!.querySelector("#focusping-root-inner") as HTMLDivElement,
+      );
     }
 
     if (!this.readyPromise) {
@@ -639,7 +641,7 @@ export class FocusPingUi {
         const mount = () => {
           // Check if a root already exists in the document (from previous content script injection)
           let host = document.getElementById("focusping-root") as HTMLDivElement | null;
-          
+
           if (host && host.shadowRoot) {
             console.log("♻️ [UI] Reusing existing focusping-root from previous injection");
             this.host = host;
@@ -694,7 +696,7 @@ export class FocusPingUi {
       hostParent: this.host?.parentElement?.tagName,
       containerInDOM: container.isConnected,
     });
-    
+
     // Make the host visible to assistive technology while the UI is shown so
     // focusing interactive elements (buttons) does not trigger the browser
     // warning about focusing an element hidden via aria-hidden.
