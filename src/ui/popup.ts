@@ -165,14 +165,20 @@ function extractBaseDomain(hostname: string): string {
   return hostname;
 }
 
-function isUrlOnWatchlist(url: string | undefined, blocklist: string[]): boolean {
+function isUrlOnWatchlist(url: string | undefined, blocklist: string[], disabledBlocklist: string[] = []): boolean {
   if (!url) return false;
 
   const domain = extractDomain(url);
   if (!domain) return false;
 
+  // Filter out disabled sites
+  const disabled = new Set(disabledBlocklist);
+
   // Check if domain or any parent domain matches the blocklist
   for (const entry of blocklist) {
+    // Skip if this entry is disabled
+    if (disabled.has(entry)) continue;
+
     // Exact match
     if (domain === entry) return true;
 
@@ -299,7 +305,11 @@ async function bootstrap() {
 
     // Check if current tab is on the watchlist
     if (currentSettings && currentTab?.url) {
-      isCurrentTabOnWatchlist = isUrlOnWatchlist(currentTab.url, currentSettings.blocklist);
+      isCurrentTabOnWatchlist = isUrlOnWatchlist(
+        currentTab.url,
+        currentSettings.blocklist,
+        currentSettings.disabledBlocklist,
+      );
 
       // Update add site button state
       if (elements.addSiteButton) {
