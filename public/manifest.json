@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "FocusPing",
-  "description": "Stay focused by catching distracting tabs and nudging you back to work.",
-  "version": "0.1.2",
+  "description": "FocusPing: Your Productivity Sidekick",
+  "version": "1.0.1",
   "icons": {
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",
