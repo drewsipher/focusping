@@ -222,7 +222,7 @@ async function sendGentleIntervention(
 ) {
   await ensureSettingsLoaded();
   const activeSettings = settings;
-  
+
   const payload = {
     domain,
     pattern,
@@ -284,7 +284,7 @@ async function sendStrictIntervention(
 ) {
   await ensureSettingsLoaded();
   const activeSettings = settings;
-  
+
   const payload = {
     domain,
     pattern,
@@ -544,7 +544,11 @@ async function handleGentleIntervention(
   }
 
   // Don't send notification immediately - just schedule the alarm
-  console.log(`⏰ [TIMER START] [${timestamp()}] Starting timer for`, domain, "without immediate notification");
+  console.log(
+    `⏰ [TIMER START] [${timestamp()}] Starting timer for`,
+    domain,
+    "without immediate notification",
+  );
 
   // Schedule the first reminder
   await scheduleGentleReminder(domain, now + frequencyMs);
@@ -623,7 +627,11 @@ async function handleStrictIntervention(
   }
 
   // Don't send notification immediately - just schedule the alarm (same as gentle mode)
-  console.log(`⏰ [TIMER START] [${timestamp()}] Starting timer for`, domain, "without immediate notification");
+  console.log(
+    `⏰ [TIMER START] [${timestamp()}] Starting timer for`,
+    domain,
+    "without immediate notification",
+  );
 
   // Schedule the first reminder
   await scheduleGentleReminder(domain, now + frequencyMs);
@@ -745,13 +753,13 @@ async function handleSnoozeCommand(payload: SnoozeCommandPayload | undefined) {
   }
 
   const minutes = payload?.minutes ?? FALLBACK_SNOOZE_MINUTES;
-  
+
   console.log(`💤 [SNOOZE] [${timestamp()}] Snooze command received`, {
     domain: targetDomain,
     minutes,
     currentInterventionKind: currentIntervention?.kind,
   });
-  
+
   // If minutes is 0, just dismiss without snoozing or re-evaluating
   if (minutes === 0) {
     console.log(`👋 [DISMISS] [${timestamp()}] Dismissing without snooze (0 minutes)`);
@@ -913,7 +921,7 @@ async function handleGentleAlarmFired(domain: string) {
     "mode:",
     activeSettings.mode,
   );
-  
+
   // Send appropriate intervention based on current mode
   if (activeSettings.mode === "strict") {
     await sendStrictIntervention(tab.id, domain, match.pattern, url!);
@@ -1081,12 +1089,7 @@ function registerListeners() {
     (async () => {
       try {
         if (iv.kind === "gentle") {
-          await sendGentleIntervention(
-            iv.tabId,
-            iv.domain,
-            iv.pattern,
-            iv.url,
-          );
+          await sendGentleIntervention(iv.tabId, iv.domain, iv.pattern, iv.url);
         } else {
           await sendStrictIntervention(iv.tabId, iv.domain, iv.pattern, iv.url);
         }
@@ -1154,13 +1157,15 @@ export async function initializeModeController() {
     onSettingsChanged(async (next) => {
       const previousMode = settings?.mode;
       const modeChanged = previousMode && next.mode !== previousMode;
-      
+
       if (modeChanged) {
-        console.log(`🔄 [MODE CHANGE] [${timestamp()}] Mode changed from ${previousMode} to ${next.mode}`);
-        
+        console.log(
+          `🔄 [MODE CHANGE] [${timestamp()}] Mode changed from ${previousMode} to ${next.mode}`,
+        );
+
         // Clear any current intervention (overlay/toast)
         await clearCurrentIntervention("mode-changed");
-        
+
         // Clear all gentle reminder alarms to reset timers
         const allAlarms = await chrome.alarms.getAll();
         for (const alarm of allAlarms) {
@@ -1170,7 +1175,7 @@ export async function initializeModeController() {
           }
         }
       }
-      
+
       settings = next;
       requestEvaluation("settings-changed");
     });

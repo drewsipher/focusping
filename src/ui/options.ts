@@ -78,7 +78,7 @@ function setDomainError(message: string | null) {
 
 function updateReminderValueDisplay(seconds: number) {
   if (!elements.reminderValue) return;
-  
+
   if (seconds < 60) {
     elements.reminderValue.textContent = `${seconds} sec`;
   } else {
@@ -299,7 +299,7 @@ async function handleBlocklistSubmit(event: SubmitEvent) {
   }
 
   let hostname: string | null = null;
-  
+
   // Try to parse as URL first
   try {
     const parsed = new URL(raw.includes("://") ? raw : `https://${raw}`);
@@ -411,21 +411,21 @@ async function bootstrap() {
   elements.scheduleEnd?.addEventListener("blur", handleScheduleEndChange);
   elements.scheduleEnd?.addEventListener("input", handleScheduleEndChange);
   elements.schedulePaused?.addEventListener("change", handleSchedulePausedChange);
-  
+
   // Reminder frequency slider - update display on input, save on change
   elements.reminderFrequency?.addEventListener("input", (event) => {
     const target = event.target as HTMLInputElement;
     const seconds = parseInt(target.value, 10);
     updateReminderValueDisplay(seconds);
   });
-  
+
   elements.reminderFrequency?.addEventListener("change", (event) => {
     const target = event.target as HTMLInputElement;
     const seconds = parseInt(target.value, 10);
     const minutes = seconds / 60;
     handleReminderFrequencyChange(minutes);
   });
-  
+
   elements.domainInput?.addEventListener("input", () => setDomainError(null));
   elements.blocklistForm?.addEventListener("submit", (event) => {
     handleBlocklistSubmit(event).catch(console.error);

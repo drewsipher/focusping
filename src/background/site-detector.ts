@@ -141,7 +141,7 @@ function resolveBlocklist(settings: Settings): { patterns: string[]; upgraded: b
 
   const normalized = new Set<string>();
   const disabled = new Set(settings.disabledBlocklist ?? []);
-  
+
   source.forEach((pattern) => {
     const compiled = normalizePattern(pattern);
     if (compiled && !disabled.has(compiled)) {

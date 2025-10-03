@@ -165,7 +165,11 @@ function extractBaseDomain(hostname: string): string {
   return hostname;
 }
 
-function isUrlOnWatchlist(url: string | undefined, blocklist: string[], disabledBlocklist: string[] = []): boolean {
+function isUrlOnWatchlist(
+  url: string | undefined,
+  blocklist: string[],
+  disabledBlocklist: string[] = [],
+): boolean {
   if (!url) return false;
 
   const domain = extractDomain(url);

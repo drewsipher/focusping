@@ -5,7 +5,12 @@ import {
   subscribeToFocusState,
   type FocusState,
 } from "./scheduler";
-import { initializeSiteDetector, isDistractingUrl, subscribeToBlocklist, type BlocklistState } from "./site-detector";
+import {
+  initializeSiteDetector,
+  isDistractingUrl,
+  subscribeToBlocklist,
+  type BlocklistState,
+} from "./site-detector";
 import { initializeModeController } from "./mode-controller";
 
 const EXTENSION_NAME = "FocusPing";

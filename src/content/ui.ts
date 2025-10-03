@@ -417,12 +417,12 @@ class GentleToast {
     const banner = this.container.parentElement;
     const host = banner?.getRootNode() as ShadowRoot;
     const hostElement = host?.host as HTMLElement;
-    
+
     if (hostElement) {
       const hostStyles = window.getComputedStyle(hostElement);
       const rootStyles = window.getComputedStyle(document.documentElement);
       const bodyStyles = window.getComputedStyle(document.body);
-      
+
       console.log("🔍 [DEBUG] Font size debugging:", {
         site: window.location.hostname,
         rootFontSize: rootStyles.fontSize,
@@ -443,7 +443,7 @@ class GentleToast {
         position: computedStyle.position,
       });
     }
-    
+
     // Debug text element styles
     if (this.headlineEl) {
       const headlineStyles = window.getComputedStyle(this.headlineEl);
@@ -597,12 +597,12 @@ class StrictOverlay {
     const overlay = this.container;
     const host = overlay?.getRootNode() as ShadowRoot;
     const hostElement = host?.host as HTMLElement;
-    
+
     if (hostElement) {
       const hostStyles = window.getComputedStyle(hostElement);
       const rootStyles = window.getComputedStyle(document.documentElement);
       const bodyStyles = window.getComputedStyle(document.body);
-      
+
       console.log("🔍 [DEBUG] Font size debugging:", {
         site: window.location.hostname,
         rootFontSize: rootStyles.fontSize,
@@ -611,7 +611,7 @@ class StrictOverlay {
         hostLineHeight: hostStyles.lineHeight,
       });
     }
-    
+
     // Debug text element styles
     if (this.headlineEl) {
       const headlineStyles = window.getComputedStyle(this.headlineEl);
@@ -631,7 +631,7 @@ class StrictOverlay {
 
     this.headlineEl.textContent = pickRandom(HEADLINES);
     this.messageEl.textContent = pickRandom(MESSAGES);
-    
+
     // Format reminder time as "X min Y sec"
     const totalSeconds = Math.round(options.reminderMinutes * 60);
     const minutes = Math.floor(totalSeconds / 60);
@@ -644,7 +644,7 @@ class StrictOverlay {
     } else {
       timeText = `${seconds} sec`;
     }
-    
+
     this.noteEl.textContent = "Switch to a productive tab or snooze the blocker temporarily.";
 
     if (this.snoozeButton) {
