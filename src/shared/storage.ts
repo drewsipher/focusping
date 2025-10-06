@@ -37,6 +37,7 @@ export interface SessionState {
   pauseUntil: number | null;
   lastGentleReminderAt: Record<string, number>;
   nextReminderInMinutes: number | null;
+  dismissedTabs: number[];
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -64,6 +65,7 @@ const DEFAULT_SESSION_STATE: SessionState = {
   pauseUntil: null,
   lastGentleReminderAt: {},
   nextReminderInMinutes: null,
+  dismissedTabs: [],
 };
 
 function normalizeDomainList(domains: string[]): string[] {
@@ -124,6 +126,7 @@ function migrateSession(payload: Partial<SessionState> | undefined): SessionStat
     snoozedDomains: payload.snoozedDomains ?? DEFAULT_SESSION_STATE.snoozedDomains,
     lastGentleReminderAt:
       payload.lastGentleReminderAt ?? DEFAULT_SESSION_STATE.lastGentleReminderAt,
+    dismissedTabs: payload.dismissedTabs ?? DEFAULT_SESSION_STATE.dismissedTabs,
   };
 
   withDefaults.version = CURRENT_SESSION_VERSION;

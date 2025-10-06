@@ -57,6 +57,7 @@ let settings: Settings | null = null;
 let currentIntervention: InterventionState | null = null;
 let evaluateInProgress = false;
 let evaluatePending = false;
+let lastActiveTabId: number | null = null;
 
 function gentleAlarmName(domain: string) {
   return `${GENTLE_REMINDER_PREFIX}${domain}`;
@@ -678,6 +679,9 @@ async function evaluate(reason: string) {
     return;
   }
 
+  // Update last active tab ID
+  lastActiveTabId = tab.id;
+
   const url = tab.url ?? tab.pendingUrl;
   console.debug("Mode controller: checking tab", { tabId: tab.id, url });
 
@@ -700,6 +704,13 @@ async function evaluate(reason: string) {
   const now = Date.now();
   let session = await getSessionState();
   session = pruneExpiredSnoozes(session, now);
+
+  // Check if this tab was dismissed
+  if (session.dismissedTabs.includes(tab.id)) {
+    console.log(`⏭️ [DISMISSED] [${timestamp()}] Tab ${tab.id} was dismissed. Dismissed tabs:`, session.dismissedTabs);
+    await clearCurrentIntervention("tab-dismissed");
+    return;
+  }
 
   if (await isDomainSnoozed(domain, session, now)) {
     console.debug("Mode controller: domain is snoozed");
@@ -760,9 +771,23 @@ async function handleSnoozeCommand(payload: SnoozeCommandPayload | undefined) {
     currentInterventionKind: currentIntervention?.kind,
   });
 
-  // If minutes is 0, just dismiss without snoozing or re-evaluating
   if (minutes === 0) {
     console.log(`👋 [DISMISS] [${timestamp()}] Dismissing without snooze (0 minutes)`);
+    
+    // Track this tab as dismissed so it won't re-trigger until tab switch
+    if (currentIntervention?.tabId) {
+      const tabId = currentIntervention.tabId;
+      await mutateSessionState((session) => {
+        const dismissedTabs = new Set(session.dismissedTabs);
+        dismissedTabs.add(tabId);
+        console.log(`👋 [DISMISS] [${timestamp()}] Added tab ${tabId} to dismissed list. Dismissed tabs:`, Array.from(dismissedTabs));
+        return {
+          ...session,
+          dismissedTabs: Array.from(dismissedTabs),
+        };
+      });
+    }
+    
     await clearCurrentIntervention("dismissed-no-snooze");
     return;
   }
@@ -849,12 +874,19 @@ async function handleGentleAlarmFired(domain: string) {
     return;
   }
 
+  // Check if this tab was dismissed
+  const session = await getSessionState();
+  if (session.dismissedTabs.includes(tab.id)) {
+    console.log(`⏭️ [ALARM] [${timestamp()}] Skipping - tab was dismissed`, tab.id);
+    currentIntervention = null;
+    return;
+  }
+
   // Check if domain is snoozed
   const now = Date.now();
-  let session = await getSessionState();
-  session = pruneExpiredSnoozes(session, now);
+  let prunedSession = pruneExpiredSnoozes(session, now);
 
-  if (await isDomainSnoozed(domain, session, now)) {
+  if (await isDomainSnoozed(domain, prunedSession, now)) {
     console.log(`⏭️ [ALARM] [${timestamp()}] Skipping - domain is snoozed`);
     currentIntervention = null;
     return;
@@ -899,17 +931,37 @@ function registerListeners() {
   listenersRegistered = true;
 
   chrome.tabs.onActivated.addListener((activeInfo) => {
-    console.debug("[Mode Controller] Tab activated:", activeInfo.tabId);
+    void (async () => {
+      console.debug("[Mode Controller] Tab activated:", activeInfo.tabId);
 
-    // Clear any intervention when switching tabs
-    if (currentIntervention) {
-      void clearCurrentIntervention("tab-switched");
-    }
+      // Clear dismissed state for the previously active tab when switching tabs
+      if (lastActiveTabId !== null && lastActiveTabId !== activeInfo.tabId) {
+        console.log(`🔄 [TAB SWITCH] [${timestamp()}] Clearing dismissed state for previous tab:`, lastActiveTabId);
+        await mutateSessionState((session) => {
+          const dismissedTabs = new Set(session.dismissedTabs);
+          const hadTab = dismissedTabs.has(lastActiveTabId!);
+          dismissedTabs.delete(lastActiveTabId!);
+          console.log(`🔄 [TAB SWITCH] [${timestamp()}] Tab ${lastActiveTabId} ${hadTab ? 'was' : 'was not'} in dismissed list. Remaining dismissed tabs:`, Array.from(dismissedTabs));
+          return {
+            ...session,
+            dismissedTabs: Array.from(dismissedTabs),
+          };
+        });
+      }
 
-    // Don't cancel pending alarms - let them fire if the user returns to the watched site
-    // The handleGentleIntervention will check if an alarm is already scheduled
+      // Update the last active tab ID
+      lastActiveTabId = activeInfo.tabId;
 
-    requestEvaluation("tab-activated");
+      // Clear any intervention when switching tabs
+      if (currentIntervention) {
+        await clearCurrentIntervention("tab-switched");
+      }
+
+      // Don't cancel pending alarms - let them fire if the user returns to the watched site
+      // The handleGentleIntervention will check if an alarm is already scheduled
+
+      requestEvaluation("tab-activated");
+    })();
   });
 
   chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
@@ -928,8 +980,23 @@ function registerListeners() {
   });
 
   chrome.tabs.onRemoved.addListener((tabId) => {
+    // Clean up dismissed state for removed tabs
+    void mutateSessionState((session) => {
+      const dismissedTabs = new Set(session.dismissedTabs);
+      dismissedTabs.delete(tabId);
+      return {
+        ...session,
+        dismissedTabs: Array.from(dismissedTabs),
+      };
+    });
+
     if (currentIntervention?.tabId === tabId) {
       void clearCurrentIntervention("tab-removed", { skipTabMessage: true });
+    }
+
+    // Clear last active tab ID if it was the removed tab
+    if (lastActiveTabId === tabId) {
+      lastActiveTabId = null;
     }
   });
 
