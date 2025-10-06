@@ -14,7 +14,6 @@ import {
 import { initializeModeController } from "./mode-controller";
 
 const EXTENSION_NAME = "FocusPing";
-const HEARTBEAT_ALARM = "focusping::heartbeat";
 
 const BADGE_LOOKUP: Record<FocusState["status"], { text: string; color: string }> = {
   active: { text: "ON", color: "#16a34a" },
@@ -130,7 +129,6 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
 chrome.runtime.onInstalled.addListener(() => {
   console.info(`${EXTENSION_NAME} installed`);
-  chrome.alarms.create(HEARTBEAT_ALARM, { periodInMinutes: 1 });
   // Attempt to inject content scripts into existing tabs on install.
   void injectContentIntoOpenTabs();
 });
@@ -203,14 +201,6 @@ async function injectContentIntoOpenTabs() {
     );
   }
 }
-
-chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === HEARTBEAT_ALARM) {
-    runtime.sendMessage({ type: "heartbeat" }).catch(() => {
-      // No active listeners yet; safe to ignore.
-    });
-  }
-});
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === "focusping::get-focus-state") {

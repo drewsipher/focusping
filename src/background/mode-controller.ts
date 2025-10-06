@@ -789,56 +789,6 @@ async function handleSnoozeCommand(payload: SnoozeCommandPayload | undefined) {
   requestEvaluation("snoozed");
 }
 
-// async function handleDismissGentleCommand(payload: DismissCommandPayload | undefined) {
-//   console.log(`👋 [DISMISS] [${timestamp()}] Handling dismiss command`, payload);
-//   const targetDomain = payload?.domain ?? currentIntervention?.domain;
-//   if (!targetDomain) {
-//     return;
-//   }
-
-//   await ensureSettingsLoaded();
-//   const activeSettings = settings;
-//   if (!activeSettings) {
-//     return;
-//   }
-
-//   const now = Date.now();
-//   const frequencyMinutes = Math.max(0.08, activeSettings.reminder.frequencyMinutes || 5);
-//   const frequencyMs = frequencyMinutes * MS_PER_MINUTE;
-
-//   console.log(`⏰ [DISMISS] [${timestamp()}] Restarting timer for`, targetDomain, {
-//     frequencyMinutes,
-//     nextAlarmAt: new Date(now + frequencyMs).toISOString(),
-//   });
-
-//   await mutateSessionState((session) => ({
-//     ...session,
-//     lastGentleReminderAt: {
-//       ...session.lastGentleReminderAt,
-//       [targetDomain]: now,
-//     },
-//     nextReminderInMinutes: null,
-//   }));
-
-//   if (currentIntervention?.kind === "gentle" && currentIntervention.domain === targetDomain) {
-//     await clearGentleReminder(targetDomain);
-//     await clearCurrentIntervention("gentle-dismissed");
-//   }
-
-//   if (currentIntervention?.kind === "strict" && currentIntervention.domain === targetDomain) {
-//     await clearGentleReminder(targetDomain);
-//     await clearCurrentIntervention("strict-dismissed");
-//   }
-
-//   // Schedule next reminder without showing notification immediately
-//   console.log("⏰ [DISMISS] Scheduling next reminder without immediate notification");
-//   await scheduleGentleReminder(targetDomain, now + frequencyMs);
-//   await updateSessionGentleState(targetDomain, frequencyMinutes, now);
-
-//   // Set currentIntervention to null so the next alarm will trigger a new one
-//   currentIntervention = null;
-// }
-
 async function handleFrequencyChanged(payload: { frequencyMinutes: number } | undefined) {
   console.log("🔄 [FREQUENCY] Reminder frequency changed", payload);
 
@@ -941,6 +891,7 @@ async function handleGentleAlarmFired(domain: string) {
 }
 
 function registerListeners() {
+  console.debug("[Mode Controller] Registering listeners");
   if (listenersRegistered) {
     return;
   }
@@ -1005,6 +956,7 @@ function registerListeners() {
   });
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    console.debug("[Mode Controller 1] Received runtime message:", message);
     if (!message?.type) {
       return;
     }
@@ -1015,11 +967,6 @@ function registerListeners() {
       void handleSnoozeCommand(message.payload).then(() => sendResponse({ ok: true }));
       return true;
     }
-
-    // if (message.type === "focusping::command-snooze-gentle") {
-    //   void handleDismissGentleCommand(message.payload).then(() => sendResponse({ ok: true }));
-    //   return true;
-    // }
 
     if (message.type === "focusping::frequency-changed") {
       void handleFrequencyChanged(message.payload).then(() => sendResponse({ ok: true }));
@@ -1060,6 +1007,7 @@ function registerListeners() {
   // currently have an active intervention for that tab/domain, re-send it so the
   // UI appears without the user needing to reload the page.
   chrome.runtime.onMessage.addListener((message, sender) => {
+    console.debug("[Mode Controller 2] Received runtime message:", message, sender);
     if (!message || message.type !== "focusping::content-ready") {
       return;
     }
