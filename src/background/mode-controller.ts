@@ -764,8 +764,6 @@ async function handleSnoozeCommand(payload: SnoozeCommandPayload | undefined) {
   if (minutes === 0) {
     console.log(`👋 [DISMISS] [${timestamp()}] Dismissing without snooze (0 minutes)`);
     await clearCurrentIntervention("dismissed-no-snooze");
-    // Don't call requestEvaluation here - user explicitly dismissed,
-    // so don't immediately show another intervention
     return;
   }
 
@@ -791,55 +789,55 @@ async function handleSnoozeCommand(payload: SnoozeCommandPayload | undefined) {
   requestEvaluation("snoozed");
 }
 
-async function handleDismissGentleCommand(payload: DismissCommandPayload | undefined) {
-  console.log(`👋 [DISMISS] [${timestamp()}] Handling dismiss command`, payload);
-  const targetDomain = payload?.domain ?? currentIntervention?.domain;
-  if (!targetDomain) {
-    return;
-  }
+// async function handleDismissGentleCommand(payload: DismissCommandPayload | undefined) {
+//   console.log(`👋 [DISMISS] [${timestamp()}] Handling dismiss command`, payload);
+//   const targetDomain = payload?.domain ?? currentIntervention?.domain;
+//   if (!targetDomain) {
+//     return;
+//   }
 
-  await ensureSettingsLoaded();
-  const activeSettings = settings;
-  if (!activeSettings) {
-    return;
-  }
+//   await ensureSettingsLoaded();
+//   const activeSettings = settings;
+//   if (!activeSettings) {
+//     return;
+//   }
 
-  const now = Date.now();
-  const frequencyMinutes = Math.max(0.08, activeSettings.reminder.frequencyMinutes || 5);
-  const frequencyMs = frequencyMinutes * MS_PER_MINUTE;
+//   const now = Date.now();
+//   const frequencyMinutes = Math.max(0.08, activeSettings.reminder.frequencyMinutes || 5);
+//   const frequencyMs = frequencyMinutes * MS_PER_MINUTE;
 
-  console.log(`⏰ [DISMISS] [${timestamp()}] Restarting timer for`, targetDomain, {
-    frequencyMinutes,
-    nextAlarmAt: new Date(now + frequencyMs).toISOString(),
-  });
+//   console.log(`⏰ [DISMISS] [${timestamp()}] Restarting timer for`, targetDomain, {
+//     frequencyMinutes,
+//     nextAlarmAt: new Date(now + frequencyMs).toISOString(),
+//   });
 
-  await mutateSessionState((session) => ({
-    ...session,
-    lastGentleReminderAt: {
-      ...session.lastGentleReminderAt,
-      [targetDomain]: now,
-    },
-    nextReminderInMinutes: null,
-  }));
+//   await mutateSessionState((session) => ({
+//     ...session,
+//     lastGentleReminderAt: {
+//       ...session.lastGentleReminderAt,
+//       [targetDomain]: now,
+//     },
+//     nextReminderInMinutes: null,
+//   }));
 
-  if (currentIntervention?.kind === "gentle" && currentIntervention.domain === targetDomain) {
-    await clearGentleReminder(targetDomain);
-    await clearCurrentIntervention("gentle-dismissed");
-  }
+//   if (currentIntervention?.kind === "gentle" && currentIntervention.domain === targetDomain) {
+//     await clearGentleReminder(targetDomain);
+//     await clearCurrentIntervention("gentle-dismissed");
+//   }
 
-  if (currentIntervention?.kind === "strict" && currentIntervention.domain === targetDomain) {
-    await clearGentleReminder(targetDomain);
-    await clearCurrentIntervention("strict-dismissed");
-  }
+//   if (currentIntervention?.kind === "strict" && currentIntervention.domain === targetDomain) {
+//     await clearGentleReminder(targetDomain);
+//     await clearCurrentIntervention("strict-dismissed");
+//   }
 
-  // Schedule next reminder without showing notification immediately
-  console.log("⏰ [DISMISS] Scheduling next reminder without immediate notification");
-  await scheduleGentleReminder(targetDomain, now + frequencyMs);
-  await updateSessionGentleState(targetDomain, frequencyMinutes, now);
+//   // Schedule next reminder without showing notification immediately
+//   console.log("⏰ [DISMISS] Scheduling next reminder without immediate notification");
+//   await scheduleGentleReminder(targetDomain, now + frequencyMs);
+//   await updateSessionGentleState(targetDomain, frequencyMinutes, now);
 
-  // Set currentIntervention to null so the next alarm will trigger a new one
-  currentIntervention = null;
-}
+//   // Set currentIntervention to null so the next alarm will trigger a new one
+//   currentIntervention = null;
+// }
 
 async function handleFrequencyChanged(payload: { frequencyMinutes: number } | undefined) {
   console.log("🔄 [FREQUENCY] Reminder frequency changed", payload);
@@ -1018,10 +1016,10 @@ function registerListeners() {
       return true;
     }
 
-    if (message.type === "focusping::command-dismiss-gentle") {
-      void handleDismissGentleCommand(message.payload).then(() => sendResponse({ ok: true }));
-      return true;
-    }
+    // if (message.type === "focusping::command-snooze-gentle") {
+    //   void handleDismissGentleCommand(message.payload).then(() => sendResponse({ ok: true }));
+    //   return true;
+    // }
 
     if (message.type === "focusping::frequency-changed") {
       void handleFrequencyChanged(message.payload).then(() => sendResponse({ ok: true }));
