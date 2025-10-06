@@ -88,7 +88,7 @@ async function scheduleGentleReminder(domain: string, dueAt: number) {
   await alarms.clear(alarmName);
   await alarms.create(alarmName, { when: dueAt });
   const delay = dueAt - Date.now();
-  console.log(`⏰ [ALARM] [${timestamp()}] Scheduled gentle reminder`, {
+  console.log(`[ALARM] [${timestamp()}] Scheduled gentle reminder`, {
     domain,
     alarmName,
     dueAt: new Date(dueAt).toISOString(),
@@ -98,7 +98,7 @@ async function scheduleGentleReminder(domain: string, dueAt: number) {
   // Verify alarm was created
   const allAlarms = await alarms.getAll();
   console.log(
-    `⏰ [ALARM] [${timestamp()}] All alarms after scheduling:`,
+    `[ALARM] [${timestamp()}] All alarms after scheduling:`,
     allAlarms.map((a) => ({
       name: a.name,
       scheduledTime: new Date(a.scheduledTime).toISOString(),
@@ -199,16 +199,16 @@ async function injectContentScriptToTab(tabId: number) {
     }
 
     // injecting content script into tab (best-effort)
-    console.log("💉 [INJECT] Injecting content script into tab", tabId, "at origin", origin);
+    console.log("[INJECT] Injecting content script into tab", tabId, "at origin", origin);
     await scripting.executeScript!({ target: { tabId }, files: ["content.js"] });
     // Give the content script a short moment to initialize.
     await new Promise((r) => setTimeout(r, 150));
-    console.log("✅ [INJECT] Content script injection completed for tab", tabId);
+    console.log("[INJECT] Content script injection completed for tab", tabId);
     // injection attempted
     return true;
   } catch (err) {
     console.log(
-      "❌ [INJECT] Content script injection failed:",
+      "[INJECT] Content script injection failed:",
       err instanceof Error ? err.message : err,
     );
     return false;
@@ -234,12 +234,12 @@ async function sendGentleIntervention(
   };
 
   try {
-    console.log("📨 [MESSAGE] Attempting to send gentle intervention to tab", tabId);
+    console.log("[MESSAGE] Attempting to send gentle intervention to tab", tabId);
     await tabs.sendMessage(tabId, {
       type: "focusping::gentle-intervention",
       payload,
     });
-    console.log("✅ [MESSAGE] tabs.sendMessage succeeded for gentle intervention", tabId);
+    console.log("[MESSAGE] tabs.sendMessage succeeded for gentle intervention", tabId);
   } catch (error) {
     // If the receiving end does not exist, try injecting the content script once
     // and retry the message.
@@ -248,17 +248,17 @@ async function sendGentleIntervention(
       (/Receiving end does not exist/.test(error.message) ||
         /message port closed/.test(error.message));
     if (needInjection) {
-      console.log("💉 [INJECT] Attempting content script injection and retry for tab", tabId);
+      console.log("[INJECT] Attempting content script injection and retry for tab", tabId);
       const injected = await injectContentScriptToTab(tabId);
-      console.log("💉 [INJECT] Injection result:", injected);
+      console.log("[INJECT] Injection result:", injected);
       try {
         await tabs.sendMessage(tabId, {
           type: "focusping::gentle-intervention",
           payload,
         });
-        console.log("✅ [INJECT] Retry succeeded for gentle intervention", tabId);
+        console.log("[INJECT] Retry succeeded for gentle intervention", tabId);
       } catch (err2) {
-        console.log("❌ [INJECT] Retry failed for gentle intervention", tabId, err2);
+        console.log("[INJECT] Retry failed for gentle intervention", tabId, err2);
         handleMissingListener(err2);
       }
     } else {
@@ -351,17 +351,17 @@ async function sendClearIntervention(tabId: number, reason: string) {
       (/Receiving end does not exist/.test(error.message) ||
         /message port closed/.test(error.message));
     if (needInjection) {
-      console.log("💉 [INJECT] Attempting content script injection and retry for clear", tabId);
+      console.log("[INJECT] Attempting content script injection and retry for clear", tabId);
       const injected = await injectContentScriptToTab(tabId);
-      console.log("💉 [INJECT] Clear injection result:", injected);
+      console.log("[INJECT] Clear injection result:", injected);
       try {
         await tabs.sendMessage(tabId, {
           type: "focusping::clear-intervention",
           payload: { reason },
         });
-        console.log("✅ [INJECT] Retry succeeded for clear intervention", tabId);
+        console.log("[INJECT] Retry succeeded for clear intervention", tabId);
       } catch (err2) {
-        console.log("❌ [INJECT] Retry failed for clear intervention", tabId, err2);
+        console.log("[INJECT] Retry failed for clear intervention", tabId, err2);
         handleMissingListener(err2);
       }
     } else {
@@ -707,7 +707,7 @@ async function evaluate(reason: string) {
 
   // Check if this tab was dismissed
   if (session.dismissedTabs.includes(tab.id)) {
-    console.log(`⏭️ [DISMISSED] [${timestamp()}] Tab ${tab.id} was dismissed. Dismissed tabs:`, session.dismissedTabs);
+    console.log(`[DISMISSED] [${timestamp()}] Tab ${tab.id} was dismissed. Dismissed tabs:`, session.dismissedTabs);
     await clearCurrentIntervention("tab-dismissed");
     return;
   }
@@ -765,14 +765,14 @@ async function handleSnoozeCommand(payload: SnoozeCommandPayload | undefined) {
 
   const minutes = payload?.minutes ?? FALLBACK_SNOOZE_MINUTES;
 
-  console.log(`💤 [SNOOZE] [${timestamp()}] Snooze command received`, {
+  console.log(`[SNOOZE] [${timestamp()}] Snooze command received`, {
     domain: targetDomain,
     minutes,
     currentInterventionKind: currentIntervention?.kind,
   });
 
   if (minutes === 0) {
-    console.log(`👋 [DISMISS] [${timestamp()}] Dismissing without snooze (0 minutes)`);
+    console.log(`[DISMISS] [${timestamp()}] Dismissing without snooze (0 minutes)`);
     
     // Track this tab as dismissed so it won't re-trigger until tab switch
     if (currentIntervention?.tabId) {
@@ -780,7 +780,7 @@ async function handleSnoozeCommand(payload: SnoozeCommandPayload | undefined) {
       await mutateSessionState((session) => {
         const dismissedTabs = new Set(session.dismissedTabs);
         dismissedTabs.add(tabId);
-        console.log(`👋 [DISMISS] [${timestamp()}] Added tab ${tabId} to dismissed list. Dismissed tabs:`, Array.from(dismissedTabs));
+        console.log(`[DISMISS] [${timestamp()}] Added tab ${tabId} to dismissed list. Dismissed tabs:`, Array.from(dismissedTabs));
         return {
           ...session,
           dismissedTabs: Array.from(dismissedTabs),
@@ -794,7 +794,7 @@ async function handleSnoozeCommand(payload: SnoozeCommandPayload | undefined) {
 
   const expiresAt = Date.now() + minutes * MS_PER_MINUTE;
 
-  console.log(`💤 [SNOOZE] [${timestamp()}] Snoozing domain`, {
+  console.log(`[SNOOZE] [${timestamp()}] Snoozing domain`, {
     domain: targetDomain,
     expiresAt: new Date(expiresAt).toISOString(),
     durationMinutes: minutes,
@@ -815,7 +815,7 @@ async function handleSnoozeCommand(payload: SnoozeCommandPayload | undefined) {
 }
 
 async function handleFrequencyChanged(payload: { frequencyMinutes: number } | undefined) {
-  console.log("🔄 [FREQUENCY] Reminder frequency changed", payload);
+  console.log("[FREQUENCY] Reminder frequency changed", payload);
 
   if (!payload || typeof payload.frequencyMinutes !== "number") {
     return;
@@ -826,7 +826,7 @@ async function handleFrequencyChanged(payload: { frequencyMinutes: number } | un
   for (const alarm of allAlarms) {
     if (alarm.name.startsWith(GENTLE_REMINDER_PREFIX)) {
       await alarms.clear(alarm.name);
-      console.log("🧹 [FREQUENCY] Cleared old alarm:", alarm.name);
+      console.log("[FREQUENCY] Cleared old alarm:", alarm.name);
     }
   }
 
@@ -834,12 +834,12 @@ async function handleFrequencyChanged(payload: { frequencyMinutes: number } | un
   currentIntervention = null;
 
   // Re-evaluate to apply new frequency if user is on a watched site
-  console.log("🔄 [FREQUENCY] Re-evaluating with new frequency");
+  console.log("[FREQUENCY] Re-evaluating with new frequency");
   requestEvaluation("frequency-changed");
 }
 
 async function handleGentleAlarmFired(domain: string) {
-  console.log(`🔔 [ALARM] [${timestamp()}] Processing alarm for domain:`, domain);
+  console.log(`[ALARM] [${timestamp()}] Processing alarm for domain:`, domain);
 
   await ensureSettingsLoaded();
   await ensureFocusState();
@@ -847,7 +847,7 @@ async function handleGentleAlarmFired(domain: string) {
   const state = focusState;
 
   if (!state || !activeSettings || !state.isMonitoring || state.status !== "active") {
-    console.log(`⏭️ [ALARM] [${timestamp()}] Skipping - not in active focus period`);
+    console.log(`[ALARM] [${timestamp()}] Skipping - not in active focus period`);
     currentIntervention = null;
     return;
   }
@@ -855,21 +855,21 @@ async function handleGentleAlarmFired(domain: string) {
   // Check if user is still on this domain
   const tab = await tabs.getActive();
   if (!tab || typeof tab.id !== "number") {
-    console.log(`⏭️ [ALARM] [${timestamp()}] Skipping - no active tab`);
+    console.log(`[ALARM] [${timestamp()}] Skipping - no active tab`);
     currentIntervention = null;
     return;
   }
 
   const url = tab.url ?? tab.pendingUrl;
   if (!isUrlMatchable(url)) {
-    console.log(`⏭️ [ALARM] [${timestamp()}] Skipping - URL not matchable`);
+    console.log(`[ALARM] [${timestamp()}] Skipping - URL not matchable`);
     currentIntervention = null;
     return;
   }
 
   const match = matchUrl(url!);
   if (!match.matched || match.host !== domain) {
-    console.log(`⏭️ [ALARM] [${timestamp()}] Skipping - user switched away from`, domain);
+    console.log(`[ALARM] [${timestamp()}] Skipping - user switched away from`, domain);
     currentIntervention = null;
     return;
   }
@@ -877,7 +877,7 @@ async function handleGentleAlarmFired(domain: string) {
   // Check if this tab was dismissed
   const session = await getSessionState();
   if (session.dismissedTabs.includes(tab.id)) {
-    console.log(`⏭️ [ALARM] [${timestamp()}] Skipping - tab was dismissed`, tab.id);
+    console.log(`[ALARM] [${timestamp()}] Skipping - tab was dismissed`, tab.id);
     currentIntervention = null;
     return;
   }
@@ -887,7 +887,7 @@ async function handleGentleAlarmFired(domain: string) {
   let prunedSession = pruneExpiredSnoozes(session, now);
 
   if (await isDomainSnoozed(domain, prunedSession, now)) {
-    console.log(`⏭️ [ALARM] [${timestamp()}] Skipping - domain is snoozed`);
+    console.log(`[ALARM] [${timestamp()}] Skipping - domain is snoozed`);
     currentIntervention = null;
     return;
   }
@@ -936,12 +936,12 @@ function registerListeners() {
 
       // Clear dismissed state for the previously active tab when switching tabs
       if (lastActiveTabId !== null && lastActiveTabId !== activeInfo.tabId) {
-        console.log(`🔄 [TAB SWITCH] [${timestamp()}] Clearing dismissed state for previous tab:`, lastActiveTabId);
+        console.log(`[TAB SWITCH] [${timestamp()}] Clearing dismissed state for previous tab:`, lastActiveTabId);
         await mutateSessionState((session) => {
           const dismissedTabs = new Set(session.dismissedTabs);
           const hadTab = dismissedTabs.has(lastActiveTabId!);
           dismissedTabs.delete(lastActiveTabId!);
-          console.log(`🔄 [TAB SWITCH] [${timestamp()}] Tab ${lastActiveTabId} ${hadTab ? 'was' : 'was not'} in dismissed list. Remaining dismissed tabs:`, Array.from(dismissedTabs));
+          console.log(`[TAB SWITCH] [${timestamp()}] Tab ${lastActiveTabId} ${hadTab ? 'was' : 'was not'} in dismissed list. Remaining dismissed tabs:`, Array.from(dismissedTabs));
           return {
             ...session,
             dismissedTabs: Array.from(dismissedTabs),
@@ -1008,14 +1008,14 @@ function registerListeners() {
 
   chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name.startsWith(GENTLE_REMINDER_PREFIX)) {
-      console.log(`🔔 [${timestamp()}] [ALARM FIRED] Gentle reminder alarm:`, alarm.name);
+      console.log(`[${timestamp()}] [ALARM FIRED] Gentle reminder alarm:`, alarm.name);
       // Extract domain from alarm name
       const domain = alarm.name.replace(GENTLE_REMINDER_PREFIX, "");
       void handleGentleAlarmFired(domain);
       return;
     }
     if (alarm.name.startsWith(SNOOZE_ALARM_PREFIX)) {
-      console.log(`🔔 [${timestamp()}] [ALARM FIRED] Snooze alarm:`, alarm.name);
+      console.log(`[${timestamp()}] [ALARM FIRED] Snooze alarm:`, alarm.name);
       // Extract domain from alarm name and show intervention immediately (don't start a new timer)
       const domain = alarm.name.replace(SNOOZE_ALARM_PREFIX, "");
       void handleGentleAlarmFired(domain);
@@ -1173,7 +1173,7 @@ export async function initializeModeController() {
 
       if (modeChanged) {
         console.log(
-          `🔄 [MODE CHANGE] [${timestamp()}] Mode changed from ${previousMode} to ${next.mode}`,
+          `[MODE CHANGE] [${timestamp()}] Mode changed from ${previousMode} to ${next.mode}`,
         );
 
         // Clear any current intervention (overlay/toast)
@@ -1184,7 +1184,7 @@ export async function initializeModeController() {
         for (const alarm of allAlarms) {
           if (alarm.name.startsWith(GENTLE_REMINDER_PREFIX)) {
             await chrome.alarms.clear(alarm.name);
-            console.log(`🔄 [MODE CHANGE] [${timestamp()}] Cleared alarm:`, alarm.name);
+            console.log(`[MODE CHANGE] [${timestamp()}] Cleared alarm:`, alarm.name);
           }
         }
       }

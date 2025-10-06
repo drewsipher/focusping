@@ -319,17 +319,17 @@ class GentleToast {
   private ensureContainer(container: HTMLElement) {
     // If we have a container and it's still in the DOM, reuse it
     if (this.container && this.container.isConnected) {
-      console.log("♻️ [UI] Reusing existing toast container");
+      console.log("[UI] Reusing existing toast container");
       return;
     }
 
     // Container is missing or detached, create a new one
     if (this.container) {
-      console.log("🧹 [UI] Old container exists but is detached, cleaning up");
+      console.log("[UI] Old container exists but is detached, cleaning up");
       this.container = null;
     }
 
-    console.log("🆕 [UI] Creating new toast container");
+    console.log("[UI] Creating new toast container");
 
     const banner = document.createElement("div");
     banner.className = "fp-banner";
@@ -370,7 +370,7 @@ class GentleToast {
     banner.appendChild(toast);
     container.appendChild(banner);
 
-    console.log("📦 [UI] Toast added to DOM", {
+    console.log("[UI] Toast added to DOM", {
       containerParent: container.parentElement?.tagName,
       bannerParent: banner.parentElement?.tagName,
       toastParent: toast.parentElement?.className,
@@ -386,7 +386,7 @@ class GentleToast {
   }
 
   hide() {
-    console.log("👋 [UI] GentleToast.hide() called");
+    console.log("[UI] GentleToast.hide() called");
 
     this.container?.parentElement?.remove();
     this.container = null;
@@ -395,11 +395,11 @@ class GentleToast {
     this.emojiEl = null;
     this.dismissButton = null;
     this.snoozeButton = null;
-    console.log("✅ [UI] GentleToast hidden and cleaned up");
+    console.log("[UI] GentleToast hidden and cleaned up");
   }
 
   show(container: HTMLElement, payload: GentleInterventionPayload, options: GentleOptions) {
-    console.log("🎨 [UI] GentleToast.show() called", {
+    console.log("[UI] GentleToast.show() called", {
       domain: payload.domain,
       hasContainer: !!this.container,
       containerInDOM: this.container?.isConnected,
@@ -407,11 +407,11 @@ class GentleToast {
 
     this.ensureContainer(container);
     if (!this.container || !this.messageEl || !this.headlineEl) {
-      console.log("❌ [UI] Missing container elements, cannot show toast");
+      console.log("[UI] Missing container elements, cannot show toast");
       return;
     }
 
-    console.log("✅ [UI] Showing gentle toast for", payload.domain);
+    console.log("[UI] Showing gentle toast for", payload.domain);
 
     // Debug font size and computed styles
     const banner = this.container.parentElement;
@@ -423,7 +423,7 @@ class GentleToast {
       const rootStyles = window.getComputedStyle(document.documentElement);
       const bodyStyles = window.getComputedStyle(document.body);
 
-      console.log("🔍 [DEBUG] Font size debugging:", {
+      console.log("[DEBUG] Font size debugging:", {
         site: window.location.hostname,
         rootFontSize: rootStyles.fontSize,
         bodyFontSize: bodyStyles.fontSize,
@@ -435,7 +435,7 @@ class GentleToast {
     // Check visibility
     if (banner) {
       const computedStyle = window.getComputedStyle(banner);
-      console.log("👁️ [UI] Toast visibility check", {
+      console.log("[UI] Toast visibility check", {
         display: computedStyle.display,
         visibility: computedStyle.visibility,
         opacity: computedStyle.opacity,
@@ -447,7 +447,7 @@ class GentleToast {
     // Debug text element styles
     if (this.headlineEl) {
       const headlineStyles = window.getComputedStyle(this.headlineEl);
-      console.log("🔍 [DEBUG] Toast headline styles:", {
+      console.log("[DEBUG] Toast headline styles:", {
         fontSize: headlineStyles.fontSize,
         lineHeight: headlineStyles.lineHeight,
         fontFamily: headlineStyles.fontFamily,
@@ -591,7 +591,7 @@ class StrictOverlay {
       return;
     }
 
-    console.log("✅ [UI] Showing strict overlay for", payload.domain);
+    console.log("[UI] Showing strict overlay for", payload.domain);
 
     // Debug font size and computed styles
     const overlay = this.container;
@@ -603,7 +603,7 @@ class StrictOverlay {
       const rootStyles = window.getComputedStyle(document.documentElement);
       const bodyStyles = window.getComputedStyle(document.body);
 
-      console.log("🔍 [DEBUG] Font size debugging:", {
+      console.log("[DEBUG] Font size debugging:", {
         site: window.location.hostname,
         rootFontSize: rootStyles.fontSize,
         bodyFontSize: bodyStyles.fontSize,
@@ -615,7 +615,7 @@ class StrictOverlay {
     // Debug text element styles
     if (this.headlineEl) {
       const headlineStyles = window.getComputedStyle(this.headlineEl);
-      console.log("🔍 [DEBUG] Overlay headline styles:", {
+      console.log("[DEBUG] Overlay headline styles:", {
         fontSize: headlineStyles.fontSize,
         lineHeight: headlineStyles.lineHeight,
         fontFamily: headlineStyles.fontFamily,
@@ -690,14 +690,14 @@ export class FocusPingUi {
           let host = document.getElementById("focusping-root") as HTMLDivElement | null;
 
           if (host && host.shadowRoot) {
-            console.log("♻️ [UI] Reusing existing focusping-root from previous injection");
+            console.log("[UI] Reusing existing focusping-root from previous injection");
             this.host = host;
             const inner = host.shadowRoot.querySelector("#focusping-root-inner") as HTMLDivElement;
             resolve(inner);
             return;
           }
 
-          console.log("🆕 [UI] Creating new focusping-root host element");
+          console.log("[UI] Creating new focusping-root host element");
           host = document.createElement("div");
           host.id = "focusping-root";
           host.setAttribute("aria-hidden", "true");
@@ -736,7 +736,7 @@ export class FocusPingUi {
 
   async showGentle(payload: GentleInterventionPayload, options: GentleOptions) {
     const container = await this.ensureContainer();
-    console.log("🏠 [UI] Host element check", {
+    console.log("[UI] Host element check", {
       hostExists: !!this.host,
       hostInDOM: this.host?.isConnected,
       hostId: this.host?.id,
@@ -750,7 +750,7 @@ export class FocusPingUi {
     container.removeAttribute("aria-hidden");
     if (this.host) {
       this.host.removeAttribute("aria-hidden");
-      console.log("✨ [UI] Removed aria-hidden from host");
+      console.log("[UI] Removed aria-hidden from host");
     }
     this.strict.hide();
     this.gentle.show(container, payload, options);

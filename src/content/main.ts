@@ -32,7 +32,7 @@ async function snoozeDomain(domain: string, minutes: number) {
 }
 
 async function handleGentleIntervention(payload: GentleInterventionPayload) {
-  console.log("🎯 [CONTENT] handleGentleIntervention called", payload.domain);
+  console.log("[CONTENT] handleGentleIntervention called", payload.domain);
   const reminderMinutes = payload.reminderMinutes;
   const showGif = payload.showGif;
 
@@ -42,7 +42,7 @@ async function handleGentleIntervention(payload: GentleInterventionPayload) {
     onDismiss: () => dismissGentle(payload.domain),
     onSnooze: () => snoozeDomain(payload.domain, reminderMinutes),
   });
-  console.log("✅ [CONTENT] handleGentleIntervention completed");
+  console.log("[CONTENT] handleGentleIntervention completed");
 }
 
 async function handleStrictIntervention(payload: StrictInterventionPayload) {
