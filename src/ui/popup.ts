@@ -1,6 +1,8 @@
 import { runtime, tabs } from "@/shared/chrome";
 import { getSettings, setSettings, type Mode, type Settings } from "@/shared/storage";
 import type { FocusState } from "@/shared/focus-state";
+import { trackPageView, trackEvent } from "@/shared/analytics";
+
 
 interface Elements {
   statusIndicator: HTMLElement | null;
@@ -253,6 +255,9 @@ async function addDomainToBlocklist(domain: string) {
 async function handleModeChange(mode: Mode) {
   if (!currentSettings) return;
 
+  // Track mode change
+  void trackEvent('mode_changed', { mode });
+
   const updated = {
     ...currentSettings,
     mode,
@@ -301,6 +306,9 @@ async function loadFocusState(): Promise<FocusState | null> {
 
 async function bootstrap() {
   elements = collectElements();
+
+  // Track popup view
+  void trackPageView('/popup', 'FocusPing Popup');
 
   try {
     currentSettings = await getSettings();

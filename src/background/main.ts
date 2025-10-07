@@ -12,6 +12,7 @@ import {
   type BlocklistState,
 } from "./site-detector";
 import { initializeModeController } from "./mode-controller";
+import { trackEvent } from "@/shared/analytics";
 
 const EXTENSION_NAME = "FocusPing";
 
@@ -127,14 +128,33 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 });
 
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener((details) => {
   console.info(`${EXTENSION_NAME} installed`);
+  
+  // Track install or update
+  if (details.reason === 'install') {
+    void trackEvent('extension_installed', {
+      version: chrome.runtime.getManifest().version,
+    });
+  } else if (details.reason === 'update') {
+    void trackEvent('extension_updated', {
+      version: chrome.runtime.getManifest().version,
+      previous_version: details.previousVersion || 'unknown',
+    });
+  }
+  
   // Attempt to inject content scripts into existing tabs on install.
   void injectContentIntoOpenTabs();
 });
 
 chrome.runtime.onStartup.addListener(() => {
   console.info(`${EXTENSION_NAME} started`);
+  
+  // Track session start (browser startup with extension enabled)
+  void trackEvent('session_start', {
+    version: chrome.runtime.getManifest().version,
+  });
+  
   const state = getCurrentFocusState();
   if (state) {
     handleFocusState(state);
@@ -209,3 +229,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 });
+
+// Send daily heartbeat to track active users and retention
+async function sendDailyHeartbeat() {
+  const lastHeartbeat = await chrome.storage.local.get('last_heartbeat');
+  const now = Date.now();
+  const oneDayMs = 24 * 60 * 60 * 1000;
+  
+  // Only send once per day
+  if (!lastHeartbeat.last_heartbeat || (now - lastHeartbeat.last_heartbeat) > oneDayMs) {
+    await trackEvent('daily_active', {
+      version: chrome.runtime.getManifest().version,
+    });
+    await chrome.storage.local.set({ last_heartbeat: now });
+  }
+}
+
+// Send heartbeat on startup and periodically
+void sendDailyHeartbeat();
+setInterval(() => {
+  void sendDailyHeartbeat();
+}, 60 * 60 * 1000); // Check every hour

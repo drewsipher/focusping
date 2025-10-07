@@ -7,6 +7,7 @@ import {
   type Mode,
   type Settings,
 } from "@/shared/storage";
+import { trackPageView } from "@/shared/analytics";
 
 type Elements = {
   modeInputs: HTMLInputElement[];
@@ -438,6 +439,9 @@ async function bootstrap() {
       renderSettings(settings);
     }
   });
+
+  // Track options page view
+  void trackPageView('/options', 'FocusPing Options');
 }
 
 bootstrap().catch(console.error);

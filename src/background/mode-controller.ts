@@ -9,6 +9,7 @@ import {
 } from "@/shared/storage";
 import { getCurrentFocusState, subscribeToFocusState, type FocusState } from "./scheduler";
 import { initializeSiteDetector, matchUrl, subscribeToBlocklist } from "./site-detector";
+import { trackEvent } from "@/shared/analytics";
 
 const GENTLE_REMINDER_PREFIX = "focusping::gentle-reminder::";
 const SNOOZE_ALARM_PREFIX = "focusping::snooze-expire::";
@@ -564,6 +565,13 @@ async function handleGentleIntervention(
     triggeredAt: now,
     reminderDueAt: now + frequencyMs,
   };
+
+  // Track intervention in analytics
+  void trackEvent('intervention_started', {
+    kind: 'gentle',
+    domain,
+    url,
+  });
 }
 
 async function handleStrictIntervention(
@@ -647,6 +655,13 @@ async function handleStrictIntervention(
     triggeredAt: now,
     reminderDueAt: now + frequencyMs,
   };
+
+  // Track intervention in analytics
+  void trackEvent('intervention_started', {
+    kind: 'strict',
+    domain,
+    url,
+  });
 }
 
 async function evaluate(reason: string) {
@@ -774,6 +789,12 @@ async function handleSnoozeCommand(payload: SnoozeCommandPayload | undefined) {
   if (minutes === 0) {
     console.log(`[DISMISS] [${timestamp()}] Dismissing without snooze (0 minutes)`);
     
+    // Track dismissal in analytics
+    void trackEvent('intervention_dismissed', {
+      domain: targetDomain,
+      kind: currentIntervention?.kind || 'unknown',
+    });
+    
     // Track this tab as dismissed so it won't re-trigger until tab switch
     if (currentIntervention?.tabId) {
       const tabId = currentIntervention.tabId;
@@ -798,6 +819,13 @@ async function handleSnoozeCommand(payload: SnoozeCommandPayload | undefined) {
     domain: targetDomain,
     expiresAt: new Date(expiresAt).toISOString(),
     durationMinutes: minutes,
+  });
+
+  // Track snooze in analytics
+  void trackEvent('intervention_snoozed', {
+    domain: targetDomain,
+    minutes: minutes,
+    kind: currentIntervention?.kind || 'unknown',
   });
 
   await mutateSessionState((session) => ({
